@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict qgzsltDbDZeILfGIAT7U4kxqZ6jCeU8H57DetIGFGCVX5IDLhRONjppooVE1Vya
+\restrict pz2yVvdxDsQ4xNAOVFRd3JZaa7Ysr3SGQMxeywv2SFrdjVrAtzklkw900VldVJe
 
--- Dumped from database version 18.4 (Ubuntu 18.4-0ubuntu0.26.04.1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-0ubuntu0.26.04.1)
+-- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
+-- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -18,6 +18,13 @@ SET check_function_bodies = false;
 SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
+
+--
+-- Name: public; Type: SCHEMA; Schema: -; Owner: -
+--
+
+-- *not* creating schema, since initdb creates it
+
 
 SET default_tablespace = '';
 
@@ -43,21 +50,96 @@ CREATE TABLE public.batch_tasks (
     merged_video_url text,
     created_at timestamp without time zone DEFAULT now(),
     updated_at timestamp without time zone DEFAULT now(),
-    init_result jsonb DEFAULT '{}'::jsonb
+    init_result jsonb DEFAULT '{}'::jsonb,
+    user_id integer
 );
 
 
 --
--- Data for Name: batch_tasks; Type: TABLE DATA; Schema: public; Owner: -
+-- Name: user_asset_groups; Type: TABLE; Schema: public; Owner: -
 --
 
-COPY public.batch_tasks (id, name, script, style, ratio, seed, shots, media_items, params, subject_defs, subtitle_input, tasks, merged_video_url, created_at, updated_at, init_result) FROM stdin;
-56f7cd2a-b27a-4d6a-be28-1e501fb639b3	123 大家好，今天带大家云游号称"人间天堂"的西藏。这里海	123 大家好，今天带大家云游号称"人间天堂"的西藏。这里海拔超过四千米，空气中的氧气含量只有平原的一半，但这并不妨碍它成为无数人心中的圣地。布达拉宫，傲立于玛布日山上已逾一千三百年，金色的屋顶在阳光下熠熠生辉，那一刻你会觉得，所有的跋涉都是值得的。纳木错，藏语意为"天湖"，湖水清澈见底，倒映着连绵雪山，那种蓝色是你此生见过最纯粹的颜色。去西藏，不仅是一场旅行，更是一次心灵的朝圣。	专业简洁的商务感，柔光棚拍：均匀柔光、浅景深、干净背景，冷调为主，专业可信的讲解氛围	9:16	560709415	[{"mood": "沉稳专业", "ratio": "9:16", "title": "开场云游", "prompt": "30岁左右男性博主，短发，戴黑框眼镜，穿深灰色防风夹克，站在干净棚拍背景前，缓缓抬起右手，掌心向上指向斜前方，目光坚定，嘴唇微动开口说话。画面底部显示字幕：'大家好，今天带大家云游号称人间天堂的西藏。'，配画外音旁白念出该内容。柔和冷调均匀光，浅景深，固定镜头，高清电影级画面，无水印，无Logo。画面底部显示字幕：\\"大家好，今天带大家云游号称'人间天堂'的西藏。\\"，配画外音旁白念出该内容，语音音色保持全片统一", "duration": 7, "subjects": ["博主"], "subtitle": "大家好，今天带大家云游号称'人间天堂'的西藏。", "description": "博主站在干净棚拍背景前，神情专注，缓缓抬手示意。", "shot_number": 1, "camera_movement": "固定"}, {"mood": "严肃坚定", "ratio": "9:16", "title": "海拔挑战", "prompt": "30岁左右男性博主，戴黑框眼镜，深灰色防风夹克，双手轻轻合拢置于胸前，微微低头，眉头微蹙，嘴唇轻启说话。画面底部显示字幕：'这里海拔超过四千米，氧气含量只有平原的一半，但这不妨碍它成为圣地。'，配画外音旁白念出该内容。柔和冷调均匀光，浅景深，缓慢推镜，高清电影级画面，无水印，无Logo，语音音色保持全片统一", "duration": 10, "subjects": ["博主"], "subtitle": "这里海拔超过四千米，氧气含量只有平原的一半，但这不妨碍它成为圣地。", "description": "博主双手合拢置于胸前，微微低头，表情严肃，强调高原环境。", "shot_number": 2, "camera_movement": "推入"}, {"mood": "崇敬庄严", "ratio": "9:16", "title": "布达拉宫", "prompt": "30岁左右男性博主，戴黑框眼镜，深灰色防风夹克，侧身面向画面右侧，缓缓抬起右手，食指指向远方，目光追随指尖方向，嘴唇微张说话。画面底部显示字幕：'布达拉宫傲立于玛布日山上已逾一千三百年，金色屋顶在阳光下熠熠生辉。'，配画外音旁白念出该内容。柔和冷调均匀光，浅景深，跟随横移运镜，高清电影级画面，无水印，无Logo，语音音色保持全片统一", "duration": 10, "subjects": ["博主"], "subtitle": "布达拉宫傲立于玛布日山上已逾一千三百年，金色屋顶在阳光下熠熠生辉。", "description": "博主侧身望向画面右侧，仿佛凝视远方的宫殿，神情崇敬。", "shot_number": 3, "camera_movement": "跟随横移"}, {"mood": "宁静纯净", "ratio": "9:16", "title": "天湖纳木错", "prompt": "30岁左右男性博主，戴黑框眼镜，深灰色防风夹克，双手自然下垂，目光温柔地望向前方，缓缓微笑，嘴唇轻启说话。画面底部显示字幕：'纳木错，藏语意为天湖，湖水清澈见底，倒映着连绵雪山，那种蓝色是你此生见过最纯粹的颜色。'，配画外音旁白念出该内容。柔和冷调均匀光，浅景深，缓慢拉出揭示，高清电影级画面，无水印，无Logo。画面底部显示字幕：\\"纳木错，藏语意为'天湖'，湖水清澈见底，倒映着连绵雪山，那种蓝色是你此生见过最纯粹的颜色。\\"，配画外音旁白念出该内容，语音音色保持全片统一", "duration": 13, "subjects": ["博主"], "subtitle": "纳木错，藏语意为'天湖'，湖水清澈见底，倒映着连绵雪山，那种蓝色是你此生见过最纯粹的颜色。", "description": "博主双手自然下垂，目光温柔地看向前方，仿佛望着湖面，神情宁静。", "shot_number": 4, "camera_movement": "拉出揭示"}, {"mood": "温暖升华", "ratio": "9:16", "title": "心灵朝圣", "prompt": "30岁左右男性博主，戴黑框眼镜，深灰色防风夹克，双手交叠轻轻放在心口，微微颔首，嘴角含笑，目光低垂，缓缓开口说话。画面底部显示字幕：'去西藏，不仅是一场旅行，更是一次心灵的朝圣。'，配画外音旁白念出该内容。柔和冷调均匀光，浅景深，固定镜头，高清电影级画面，无水印，无Logo，语音音色保持全片统一", "duration": 7, "subjects": ["博主"], "subtitle": "去西藏，不仅是一场旅行，更是一次心灵的朝圣。", "description": "博主双手交叠放在心口，微微颔首，表情温暖，传递升华主题。", "shot_number": 5, "camera_movement": "固定"}]	[{"url": "asset://remote:asset-20260806074749-kg6rq", "name": "mee", "mediaType": "image", "previewUrl": "https://ark-media-asset-ap-southeast-1.tos-ap-southeast-1.volces.com/3002389684/080607474873037031.jpg?X-Tos-Algorithm=TOS4-HMAC-SHA256&X-Tos-Credential=REDACTED&X-Tos-Date=20260807T034957Z&X-Tos-Expires=41400&X-Tos-Security-Token=REDACTED&X-Tos-Signature=REDACTED&X-Tos-SignedHeaders=host"}]	{"seed": 560709415, "draft": false, "model": "doubao-seedance-2-0-fast", "priority": 0, "watermark": false, "webSearch": false, "resolution": "720p", "serviceTier": "default", "subtitleMode": "on", "generateAudio": true, "returnLastFrame": false}			{}	\N	2026-08-07 03:49:09.108761	2026-08-07 04:12:54.531895	{"shots": [{"mood": "沉稳专业", "ratio": "9:16", "title": "开场云游", "prompt": "30岁左右男性博主，短发，戴黑框眼镜，穿深灰色防风夹克，站在干净棚拍背景前，缓缓抬起右手，掌心向上指向斜前方，目光坚定，嘴唇微动开口说话。画面底部显示字幕：'大家好，今天带大家云游号称人间天堂的西藏。'，配画外音旁白念出该内容。柔和冷调均匀光，浅景深，固定镜头，高清电影级画面，无水印，无Logo。画面底部显示字幕：\\"大家好，今天带大家云游号称'人间天堂'的西藏。\\"，配画外音旁白念出该内容，语音音色保持全片统一", "duration": 7, "subjects": ["博主"], "subtitle": "大家好，今天带大家云游号称'人间天堂'的西藏。", "description": "博主站在干净棚拍背景前，神情专注，缓缓抬手示意。", "shot_number": 1, "camera_movement": "固定"}, {"mood": "严肃坚定", "ratio": "9:16", "title": "海拔挑战", "prompt": "30岁左右男性博主，戴黑框眼镜，深灰色防风夹克，双手轻轻合拢置于胸前，微微低头，眉头微蹙，嘴唇轻启说话。画面底部显示字幕：'这里海拔超过四千米，氧气含量只有平原的一半，但这不妨碍它成为圣地。'，配画外音旁白念出该内容。柔和冷调均匀光，浅景深，缓慢推镜，高清电影级画面，无水印，无Logo，语音音色保持全片统一", "duration": 10, "subjects": ["博主"], "subtitle": "这里海拔超过四千米，氧气含量只有平原的一半，但这不妨碍它成为圣地。", "description": "博主双手合拢置于胸前，微微低头，表情严肃，强调高原环境。", "shot_number": 2, "camera_movement": "推入"}, {"mood": "崇敬庄严", "ratio": "9:16", "title": "布达拉宫", "prompt": "30岁左右男性博主，戴黑框眼镜，深灰色防风夹克，侧身面向画面右侧，缓缓抬起右手，食指指向远方，目光追随指尖方向，嘴唇微张说话。画面底部显示字幕：'布达拉宫傲立于玛布日山上已逾一千三百年，金色屋顶在阳光下熠熠生辉。'，配画外音旁白念出该内容。柔和冷调均匀光，浅景深，跟随横移运镜，高清电影级画面，无水印，无Logo，语音音色保持全片统一", "duration": 10, "subjects": ["博主"], "subtitle": "布达拉宫傲立于玛布日山上已逾一千三百年，金色屋顶在阳光下熠熠生辉。", "description": "博主侧身望向画面右侧，仿佛凝视远方的宫殿，神情崇敬。", "shot_number": 3, "camera_movement": "跟随横移"}, {"mood": "宁静纯净", "ratio": "9:16", "title": "天湖纳木错", "prompt": "30岁左右男性博主，戴黑框眼镜，深灰色防风夹克，双手自然下垂，目光温柔地望向前方，缓缓微笑，嘴唇轻启说话。画面底部显示字幕：'纳木错，藏语意为天湖，湖水清澈见底，倒映着连绵雪山，那种蓝色是你此生见过最纯粹的颜色。'，配画外音旁白念出该内容。柔和冷调均匀光，浅景深，缓慢拉出揭示，高清电影级画面，无水印，无Logo。画面底部显示字幕：\\"纳木错，藏语意为'天湖'，湖水清澈见底，倒映着连绵雪山，那种蓝色是你此生见过最纯粹的颜色。\\"，配画外音旁白念出该内容，语音音色保持全片统一", "duration": 13, "subjects": ["博主"], "subtitle": "纳木错，藏语意为'天湖'，湖水清澈见底，倒映着连绵雪山，那种蓝色是你此生见过最纯粹的颜色。", "description": "博主双手自然下垂，目光温柔地看向前方，仿佛望着湖面，神情宁静。", "shot_number": 4, "camera_movement": "拉出揭示"}, {"mood": "温暖升华", "ratio": "9:16", "title": "心灵朝圣", "prompt": "30岁左右男性博主，戴黑框眼镜，深灰色防风夹克，双手交叠轻轻放在心口，微微颔首，嘴角含笑，目光低垂，缓缓开口说话。画面底部显示字幕：'去西藏，不仅是一场旅行，更是一次心灵的朝圣。'，配画外音旁白念出该内容。柔和冷调均匀光，浅景深，固定镜头，高清电影级画面，无水印，无Logo，语音音色保持全片统一", "duration": 7, "subjects": ["博主"], "subtitle": "去西藏，不仅是一场旅行，更是一次心灵的朝圣。", "description": "博主双手交叠放在心口，微微颔首，表情温暖，传递升华主题。", "shot_number": 5, "camera_movement": "固定"}], "shotCount": 4, "autoShotCount": 4, "characterAnchor": "一位30岁左右的男性旅行博主，短发，面容清瘦，佩戴黑框眼镜，身穿深灰色防风夹克，内搭白色T恤，整体气质专业而沉稳。视觉风格为专业简洁的商务感，柔光棚拍：均匀柔光、浅景深、干净背景，冷调为主，画面高清，电影级质感，营造专业可信的讲解氛围。", "totalVideoDuration": 47}
-911710ca-ddd9-4339-ae0e-ea64b656ed56	每一个成功的背后，都有无数个不为人知的艰难时刻。你以为别人的	每一个成功的背后，都有无数个不为人知的艰难时刻。你以为别人的成功是天赋，其实是他们在你看不见的地方，默默努力了无数个日夜。失败了没关系，重要的是你有没有从中学到了什么。人生最大的遗憾，不是努力了没有成功，而是本可以成功，却没有努力。从今天开始，不要再为昨天的错误而懊悔，把每一分钟都用来创造更好的明天。记住，你比你想象中更加强大。	专业简洁的商务感，柔光棚拍：均匀柔光、浅景深、干净背景，冷调为主，专业可信的讲解氛围	9:16	1513057942	[{"mood": "专注坚毅", "ratio": "9:16", "title": "深夜独坐", "prompt": "<图片 1>中的职业女性独自坐在深夜的办公室内，桌上一盏台灯散发冷白柔光，她微微低头，右手食指轻轻翻动桌上文件，目光专注而坚定。画面底部显示字幕：\\"每一个成功的背后，都有无数个不为人知的艰难时刻。你以为别人的成功是天赋，其实是他们在你看不见的地方，默默努力了无数个日夜。\\"，配画外音旁白念出该内容。缓慢推镜，冷白主光，专业商务感，高清电影级画面，无水印，无Logo，语音音色保持全片统一", "duration": 15, "subjects": ["职场女性"], "subtitle": "每一个成功的背后，都有无数个不为人知的艰难时刻。你以为别人的成功是天赋，其实是他们在你看不见的地方，默默努力了无数个日夜。", "description": "深夜办公室，主角独坐桌前，台灯一盏，窗外夜色。", "shot_number": 1, "camera_movement": "推入"}, {"mood": "释然坚定", "ratio": "9:16", "title": "失败重来", "prompt": "<图片 1>中的职业女性坐在办公桌前，缓缓抬起右手拿起一支笔，左手轻轻按住笔记本，低头在纸上写下几行字，随后微微抬头，眼神中透出释然与坚定。画面底部显示字幕：\\"失败了没关系，重要的是你有没有从中学到了什么。\\"，配画外音旁白念出该内容。固定镜头，冷白柔光，浅景深，专业商务感，高清电影级画面，无水印，无Logo，语音音色保持全片统一", "duration": 7, "subjects": ["职场女性"], "subtitle": "失败了没关系，重要的是你有没有从中学到了什么。", "description": "办公桌前，主角拿起笔，在纸上写下笔记。", "shot_number": 2, "camera_movement": "固定"}, {"mood": "坚定决然", "ratio": "9:16", "title": "后悔与前行", "prompt": "<图片 1>中的职业女性站在会议室落地窗前，双手轻轻交叠放在身前，目光望向窗外远处的城市天际线，微微侧头，神情从沉思转为坚定，随后缓缓转身面向镜头。画面底部显示字幕：\\"人生最大的遗憾，不是努力了没有成功，而是本可以成功，却没有努力。从今天开始，不要再为昨天的错误而懊悔，把每一分钟都用来创造更好的明天。\\"，配画外音旁白念出该内容。缓慢拉出揭示环境，冷白柔光，专业商务感，高清电影级画面，无水印，无Logo，语音音色保持全片统一", "duration": 15, "subjects": ["职场女性"], "subtitle": "人生最大的遗憾，不是努力了没有成功，而是本可以成功，却没有努力。从今天开始，不要再为昨天的错误而懊悔，把每一分钟都用来创造更好的明天。", "description": "会议室落地窗前，主角站立，望向窗外城市远景。", "shot_number": 3, "camera_movement": "拉出揭示"}, {"mood": "自信昂扬", "ratio": "9:16", "title": "强大自我", "prompt": "<图片 1>中的职业女性回到办公桌前，双手轻轻撑在桌沿，缓缓抬起头，目光直视镜头，嘴角微微上扬，露出自信而坚定的微笑，整个人的姿态从容挺拔。画面底部显示字幕：\\"记住，你比你想象中更加强大。\\"，配画外音旁白念出该内容。缓慢推镜，冷白柔光，专业商务感，高清电影级画面，无水印，无Logo，语音音色保持全片统一", "duration": 4, "subjects": ["职场女性"], "subtitle": "记住，你比你想象中更加强大。", "description": "主角回到办公桌前，双手撑桌，抬头面向镜头，神情自信。", "shot_number": 4, "camera_movement": "推入"}]	[{"url": "asset://remote:asset-20260806074749-kg6rq", "name": "mee", "mediaType": "image", "previewUrl": "https://ark-media-asset-ap-southeast-1.tos-ap-southeast-1.volces.com/3002389684/080607474873037031.jpg?X-Tos-Algorithm=TOS4-HMAC-SHA256&X-Tos-Credential=REDACTED&X-Tos-Date=20260807T040746Z&X-Tos-Expires=41400&X-Tos-Security-Token=REDACTED&X-Tos-Signature=REDACTED&X-Tos-SignedHeaders=host"}]	{"seed": 1513057942, "draft": false, "model": "doubao-seedance-2-0-fast", "priority": 0, "watermark": false, "webSearch": false, "resolution": "720p", "serviceTier": "default", "subtitleMode": "on", "generateAudio": false, "returnLastFrame": false}		每一个成功的背后，都有无数个不为人知的艰难时刻。你以为别人的成功是天赋，其实是他们在你看不见的地方，默默努力了无数个日夜。失败了没关系，重要的是你有没有从中学到了什么。人生最大的遗憾，不是努力了没有成功，而是本可以成功，却没有努力。从今天开始，不要再为昨天的错误而懊悔，把每一分钟都用来创造更好的明天。记住，你比你想象中更加强大。	{"1": {"error": "API error 429", "status": "failed", "taskId": null, "videoUrl": null, "shotIndex": 1, "submitting": false}}	\N	2026-08-07 04:34:56.07125	2026-08-07 06:02:43.413659	{"shots": [{"mood": "专注坚毅", "ratio": "9:16", "title": "深夜独坐", "prompt": "<图片 1>中的职业女性独自坐在深夜的办公室内，桌上一盏台灯散发冷白柔光，她微微低头，右手食指轻轻翻动桌上文件，目光专注而坚定。画面底部显示字幕：\\"每一个成功的背后，都有无数个不为人知的艰难时刻。你以为别人的成功是天赋，其实是他们在你看不见的地方，默默努力了无数个日夜。\\"，配画外音旁白念出该内容。缓慢推镜，冷白主光，专业商务感，高清电影级画面，无水印，无Logo，语音音色保持全片统一", "duration": 15, "subjects": ["职场女性"], "subtitle": "每一个成功的背后，都有无数个不为人知的艰难时刻。你以为别人的成功是天赋，其实是他们在你看不见的地方，默默努力了无数个日夜。", "description": "深夜办公室，主角独坐桌前，台灯一盏，窗外夜色。", "shot_number": 1, "camera_movement": "推入"}, {"mood": "释然坚定", "ratio": "9:16", "title": "失败重来", "prompt": "<图片 1>中的职业女性坐在办公桌前，缓缓抬起右手拿起一支笔，左手轻轻按住笔记本，低头在纸上写下几行字，随后微微抬头，眼神中透出释然与坚定。画面底部显示字幕：\\"失败了没关系，重要的是你有没有从中学到了什么。\\"，配画外音旁白念出该内容。固定镜头，冷白柔光，浅景深，专业商务感，高清电影级画面，无水印，无Logo，语音音色保持全片统一", "duration": 7, "subjects": ["职场女性"], "subtitle": "失败了没关系，重要的是你有没有从中学到了什么。", "description": "办公桌前，主角拿起笔，在纸上写下笔记。", "shot_number": 2, "camera_movement": "固定"}, {"mood": "坚定决然", "ratio": "9:16", "title": "后悔与前行", "prompt": "<图片 1>中的职业女性站在会议室落地窗前，双手轻轻交叠放在身前，目光望向窗外远处的城市天际线，微微侧头，神情从沉思转为坚定，随后缓缓转身面向镜头。画面底部显示字幕：\\"人生最大的遗憾，不是努力了没有成功，而是本可以成功，却没有努力。从今天开始，不要再为昨天的错误而懊悔，把每一分钟都用来创造更好的明天。\\"，配画外音旁白念出该内容。缓慢拉出揭示环境，冷白柔光，专业商务感，高清电影级画面，无水印，无Logo，语音音色保持全片统一", "duration": 15, "subjects": ["职场女性"], "subtitle": "人生最大的遗憾，不是努力了没有成功，而是本可以成功，却没有努力。从今天开始，不要再为昨天的错误而懊悔，把每一分钟都用来创造更好的明天。", "description": "会议室落地窗前，主角站立，望向窗外城市远景。", "shot_number": 3, "camera_movement": "拉出揭示"}, {"mood": "自信昂扬", "ratio": "9:16", "title": "强大自我", "prompt": "<图片 1>中的职业女性回到办公桌前，双手轻轻撑在桌沿，缓缓抬起头，目光直视镜头，嘴角微微上扬，露出自信而坚定的微笑，整个人的姿态从容挺拔。画面底部显示字幕：\\"记住，你比你想象中更加强大。\\"，配画外音旁白念出该内容。缓慢推镜，冷白柔光，专业商务感，高清电影级画面，无水印，无Logo，语音音色保持全片统一", "duration": 4, "subjects": ["职场女性"], "subtitle": "记住，你比你想象中更加强大。", "description": "主角回到办公桌前，双手撑桌，抬头面向镜头，神情自信。", "shot_number": 4, "camera_movement": "推入"}], "shotCount": 4, "autoShotCount": 4, "characterAnchor": "<图片 1>中30岁左右的职业女性，中长发自然垂肩，穿着剪裁利落的深蓝色西装外套内搭白色衬衫，体态挺拔自信。电影级画面质感，高清4K，专业商务风格，柔光棚拍，均匀柔光、浅景深、干净背景，冷调为主，专业可信的讲解氛围。", "totalVideoDuration": 41}
-5c6f7421-3068-4e9d-94f5-630e3e2d72a6	每一个成功的背后，都有无数个不为人知的艰难时刻。你以为别人的	每一个成功的背后，都有无数个不为人知的艰难时刻。你以为别人的成功是天赋，其实是他们在你看不见的地方，默默努力了无数个日夜。失败了没关系，重要的是你有没有从中学到了什么。人生最大的遗憾，不是努力了没有成功，而是本可以成功，却没有努力。从今天开始，不要再为昨天的错误而懊悔，把每一分钟都用来创造更好的明天。记住，你比你想象中更加强大。	专业简洁的商务感，柔光棚拍：均匀柔光、浅景深、干净背景，冷调为主，专业可信的讲解氛围	9:16	1513057942	[{"mood": "专注坚毅", "ratio": "9:16", "title": "深夜独坐", "prompt": "<图片 1>中的职业女性独自坐在深夜的办公室内，桌上一盏台灯散发冷白柔光，她微微低头，右手食指轻轻翻动桌上文件，目光专注而坚定。画面底部显示字幕：\\"每一个成功的背后，都有无数个不为人知的艰难时刻。你以为别人的成功是天赋，其实是他们在你看不见的地方，默默努力了无数个日夜。\\"，配画外音旁白念出该内容。缓慢推镜，冷白主光，专业商务感，高清电影级画面，无水印，无Logo，语音音色保持全片统一", "duration": 15, "subjects": ["职场女性"], "subtitle": "每一个成功的背后，都有无数个不为人知的艰难时刻。你以为别人的成功是天赋，其实是他们在你看不见的地方，默默努力了无数个日夜。", "description": "深夜办公室，主角独坐桌前，台灯一盏，窗外夜色。", "shot_number": 1, "camera_movement": "推入"}, {"mood": "释然坚定", "ratio": "9:16", "title": "失败重来", "prompt": "<图片 1>中的职业女性坐在办公桌前，缓缓抬起右手拿起一支笔，左手轻轻按住笔记本，低头在纸上写下几行字，随后微微抬头，眼神中透出释然与坚定。画面底部显示字幕：\\"失败了没关系，重要的是你有没有从中学到了什么。\\"，配画外音旁白念出该内容。固定镜头，冷白柔光，浅景深，专业商务感，高清电影级画面，无水印，无Logo，语音音色保持全片统一", "duration": 7, "subjects": ["职场女性"], "subtitle": "失败了没关系，重要的是你有没有从中学到了什么。", "description": "办公桌前，主角拿起笔，在纸上写下笔记。", "shot_number": 2, "camera_movement": "固定"}, {"mood": "坚定决然", "ratio": "9:16", "title": "后悔与前行", "prompt": "<图片 1>中的职业女性站在会议室落地窗前，双手轻轻交叠放在身前，目光望向窗外远处的城市天际线，微微侧头，神情从沉思转为坚定，随后缓缓转身面向镜头。画面底部显示字幕：\\"人生最大的遗憾，不是努力了没有成功，而是本可以成功，却没有努力。从今天开始，不要再为昨天的错误而懊悔，把每一分钟都用来创造更好的明天。\\"，配画外音旁白念出该内容。缓慢拉出揭示环境，冷白柔光，专业商务感，高清电影级画面，无水印，无Logo，语音音色保持全片统一", "duration": 15, "subjects": ["职场女性"], "subtitle": "人生最大的遗憾，不是努力了没有成功，而是本可以成功，却没有努力。从今天开始，不要再为昨天的错误而懊悔，把每一分钟都用来创造更好的明天。", "description": "会议室落地窗前，主角站立，望向窗外城市远景。", "shot_number": 3, "camera_movement": "拉出揭示"}, {"mood": "自信昂扬", "ratio": "9:16", "title": "强大自我", "prompt": "<图片 1>中的职业女性回到办公桌前，双手轻轻撑在桌沿，缓缓抬起头，目光直视镜头，嘴角微微上扬，露出自信而坚定的微笑，整个人的姿态从容挺拔。画面底部显示字幕：\\"记住，你比你想象中更加强大。\\"，配画外音旁白念出该内容。缓慢推镜，冷白柔光，专业商务感，高清电影级画面，无水印，无Logo，语音音色保持全片统一", "duration": 4, "subjects": ["职场女性"], "subtitle": "记住，你比你想象中更加强大。", "description": "主角回到办公桌前，双手撑桌，抬头面向镜头，神情自信。", "shot_number": 4, "camera_movement": "推入"}]	[{"url": "asset://remote:asset-20260806074749-kg6rq", "name": "mee", "mediaType": "image", "previewUrl": "https://ark-media-asset-ap-southeast-1.tos-ap-southeast-1.volces.com/3002389684/080607474873037031.jpg?X-Tos-Algorithm=TOS4-HMAC-SHA256&X-Tos-Credential=REDACTED&X-Tos-Date=20260807T040746Z&X-Tos-Expires=41400&X-Tos-Security-Token=REDACTED&X-Tos-Signature=REDACTED&X-Tos-SignedHeaders=host"}]	{"seed": 1513057942, "draft": false, "model": "doubao-seedance-2-0-fast", "priority": 0, "watermark": false, "webSearch": false, "resolution": "720p", "serviceTier": "default", "subtitleMode": "on", "generateAudio": true, "returnLastFrame": false}		每一个成功的背后，都有无数个不为人知的艰难时刻。你以为别人的成功是天赋，其实是他们在你看不见的地方，默默努力了无数个日夜。失败了没关系，重要的是你有没有从中学到了什么。人生最大的遗憾，不是努力了没有成功，而是本可以成功，却没有努力。从今天开始，不要再为昨天的错误而懊悔，把每一分钟都用来创造更好的明天。记住，你比你想象中更加强大。	{}	\N	2026-08-07 04:42:14.724577	2026-08-07 04:42:14.724577	{"shots": [{"mood": "专注坚毅", "ratio": "9:16", "title": "深夜独坐", "prompt": "<图片 1>中的职业女性独自坐在深夜的办公室内，桌上一盏台灯散发冷白柔光，她微微低头，右手食指轻轻翻动桌上文件，目光专注而坚定。画面底部显示字幕：\\"每一个成功的背后，都有无数个不为人知的艰难时刻。你以为别人的成功是天赋，其实是他们在你看不见的地方，默默努力了无数个日夜。\\"，配画外音旁白念出该内容。缓慢推镜，冷白主光，专业商务感，高清电影级画面，无水印，无Logo，语音音色保持全片统一", "duration": 15, "subjects": ["职场女性"], "subtitle": "每一个成功的背后，都有无数个不为人知的艰难时刻。你以为别人的成功是天赋，其实是他们在你看不见的地方，默默努力了无数个日夜。", "description": "深夜办公室，主角独坐桌前，台灯一盏，窗外夜色。", "shot_number": 1, "camera_movement": "推入"}, {"mood": "释然坚定", "ratio": "9:16", "title": "失败重来", "prompt": "<图片 1>中的职业女性坐在办公桌前，缓缓抬起右手拿起一支笔，左手轻轻按住笔记本，低头在纸上写下几行字，随后微微抬头，眼神中透出释然与坚定。画面底部显示字幕：\\"失败了没关系，重要的是你有没有从中学到了什么。\\"，配画外音旁白念出该内容。固定镜头，冷白柔光，浅景深，专业商务感，高清电影级画面，无水印，无Logo，语音音色保持全片统一", "duration": 7, "subjects": ["职场女性"], "subtitle": "失败了没关系，重要的是你有没有从中学到了什么。", "description": "办公桌前，主角拿起笔，在纸上写下笔记。", "shot_number": 2, "camera_movement": "固定"}, {"mood": "坚定决然", "ratio": "9:16", "title": "后悔与前行", "prompt": "<图片 1>中的职业女性站在会议室落地窗前，双手轻轻交叠放在身前，目光望向窗外远处的城市天际线，微微侧头，神情从沉思转为坚定，随后缓缓转身面向镜头。画面底部显示字幕：\\"人生最大的遗憾，不是努力了没有成功，而是本可以成功，却没有努力。从今天开始，不要再为昨天的错误而懊悔，把每一分钟都用来创造更好的明天。\\"，配画外音旁白念出该内容。缓慢拉出揭示环境，冷白柔光，专业商务感，高清电影级画面，无水印，无Logo，语音音色保持全片统一", "duration": 15, "subjects": ["职场女性"], "subtitle": "人生最大的遗憾，不是努力了没有成功，而是本可以成功，却没有努力。从今天开始，不要再为昨天的错误而懊悔，把每一分钟都用来创造更好的明天。", "description": "会议室落地窗前，主角站立，望向窗外城市远景。", "shot_number": 3, "camera_movement": "拉出揭示"}, {"mood": "自信昂扬", "ratio": "9:16", "title": "强大自我", "prompt": "<图片 1>中的职业女性回到办公桌前，双手轻轻撑在桌沿，缓缓抬起头，目光直视镜头，嘴角微微上扬，露出自信而坚定的微笑，整个人的姿态从容挺拔。画面底部显示字幕：\\"记住，你比你想象中更加强大。\\"，配画外音旁白念出该内容。缓慢推镜，冷白柔光，专业商务感，高清电影级画面，无水印，无Logo，语音音色保持全片统一", "duration": 4, "subjects": ["职场女性"], "subtitle": "记住，你比你想象中更加强大。", "description": "主角回到办公桌前，双手撑桌，抬头面向镜头，神情自信。", "shot_number": 4, "camera_movement": "推入"}], "shotCount": 4, "autoShotCount": 4, "characterAnchor": "<图片 1>中30岁左右的职业女性，中长发自然垂肩，穿着剪裁利落的深蓝色西装外套内搭白色衬衫，体态挺拔自信。电影级画面质感，高清4K，专业商务风格，柔光棚拍，均匀柔光、浅景深、干净背景，冷调为主，专业可信的讲解氛围。", "totalVideoDuration": 41}
-02f26350-de3c-4712-b6f1-a07090cbb254	保险方案视频制作	保险方案视频制作	专业简洁的商务感，柔光棚拍：均匀柔光、浅景深、干净背景，冷调为主，专业可信的讲解氛围	9:16	807621309	[{"mood": "沉稳专业", "ratio": "9:16", "title": "开场亮相", "prompt": "一位35岁男性保险顾问，短发，深色西装浅蓝衬衫，细框眼镜，体态挺拔，站在干净棚拍背景前，缓缓抬头目光直视镜头，双手轻轻握紧手中文件，画面底部显示字幕：'面对不确定的未来，你需要一份确定的保障。'，配画外音旁白念出该内容，均匀柔光，浅景深，冷调为主，固定镜头，电影级画面，无水印，无Logo，语音音色保持全片统一", "duration": 6, "subjects": ["保险顾问"], "subtitle": "面对不确定的未来，你需要一份确定的保障。", "description": "保险顾问在棚拍背景前，缓缓抬头看向镜头，双手轻握文件。", "shot_number": 1, "camera_movement": "固定"}, {"mood": "专业可信", "ratio": "9:16", "title": "专业讲解", "prompt": "接上一镜头，保险顾问缓缓低头翻开手中文件，右手轻轻指向文件内容，再抬头微笑，左手微微抬起做出邀请手势，画面底部显示字幕：'量身定制的方案，为你和家人保驾护航。'，配画外音旁白念出该内容，均匀柔光，浅景深，冷调为主，缓慢推镜，电影级画面，无水印，无Logo，语音音色保持全片统一", "duration": 6, "subjects": ["保险顾问"], "subtitle": "量身定制的方案，为你和家人保驾护航。", "description": "顾问低头翻开文件，抬头微笑，做出邀请手势。", "shot_number": 2, "camera_movement": "推入"}]	[]	{"seed": 807621309, "draft": false, "model": "doubao-seedance-2-0-fast", "priority": 0, "watermark": false, "webSearch": false, "resolution": "720p", "serviceTier": "default", "subtitleMode": "on", "generateAudio": true, "returnLastFrame": false}			{"0": {"error": null, "status": "succeeded", "taskId": "ab1193c3-7c69-471b-95ed-12cc408795ed", "videoUrl": "https://videogen.fidelityai.cn:443/files/YWIxMTkzYzMtN2M2OS00NzFiLTk1ZWQtMTJjYzQwODc5NWVkOjE3ODYxNjMxNDk.VCKqvYFHjY_20BmjAfHCOCCTStIeBD9hon1j-wR0JRA", "shotIndex": 0, "submitting": false}, "1": {"error": null, "status": "succeeded", "taskId": "95d3bbd5-33c2-4fc3-9151-4bdbb5b98e27", "videoUrl": "https://videogen.fidelityai.cn:443/files/OTVkM2JiZDUtMzNjMi00ZmMzLTkxNTEtNGJkYmI1Yjk4ZTI3OjE3ODYxNjMxNTA.XS6vgyIjFn54qNW6OoDCafoxW9i_JUVPQivhPs3kqOw", "shotIndex": 1, "submitting": false}}	https://sd.xingke888.com/uploads/voiceover-1786077069658.mp4	2026-08-07 04:25:22.212708	2026-08-07 04:31:25.828086	{"shots": [{"mood": "沉稳专业", "ratio": "9:16", "title": "开场亮相", "prompt": "一位35岁男性保险顾问，短发，深色西装浅蓝衬衫，细框眼镜，体态挺拔，站在干净棚拍背景前，缓缓抬头目光直视镜头，双手轻轻握紧手中文件，画面底部显示字幕：'面对不确定的未来，你需要一份确定的保障。'，配画外音旁白念出该内容，均匀柔光，浅景深，冷调为主，固定镜头，电影级画面，无水印，无Logo，语音音色保持全片统一", "duration": 6, "subjects": ["保险顾问"], "subtitle": "面对不确定的未来，你需要一份确定的保障。", "description": "保险顾问在棚拍背景前，缓缓抬头看向镜头，双手轻握文件。", "shot_number": 1, "camera_movement": "固定"}, {"mood": "专业可信", "ratio": "9:16", "title": "专业讲解", "prompt": "接上一镜头，保险顾问缓缓低头翻开手中文件，右手轻轻指向文件内容，再抬头微笑，左手微微抬起做出邀请手势，画面底部显示字幕：'量身定制的方案，为你和家人保驾护航。'，配画外音旁白念出该内容，均匀柔光，浅景深，冷调为主，缓慢推镜，电影级画面，无水印，无Logo，语音音色保持全片统一", "duration": 6, "subjects": ["保险顾问"], "subtitle": "量身定制的方案，为你和家人保驾护航。", "description": "顾问低头翻开文件，抬头微笑，做出邀请手势。", "shot_number": 2, "camera_movement": "推入"}], "shotCount": 2, "autoShotCount": 2, "characterAnchor": "一位35岁左右的男性保险顾问，短发，深色西装搭配浅蓝衬衫，佩戴细框眼镜，体态挺拔，面容沉稳专业。整体视觉风格为专业简洁的商务感，柔光棚拍，均匀柔光、浅景深、干净背景，冷调为主，高清、电影级画面，营造专业可信的讲解氛围。", "totalVideoDuration": 12}
-3c86e1d5-0fbe-4217-98c2-e54d4d320b35	每一个成功的背后，都有无数个不为人知的艰难时刻。你以为别人的	每一个成功的背后，都有无数个不为人知的艰难时刻。你以为别人的成功是天赋，其实是他们在你看不见的地方，默默努力了无数个日夜。失败了没关系，重要的是你有没有从中学到了什么。人生最大的遗憾，不是努力了没有成功，而是本可以成功，却没有努力。从今天开始，不要再为昨天的错误而懊悔，把每一分钟都用来创造更好的明天。记住，你比你想象中更加强大。	专业简洁的商务感，柔光棚拍：均匀柔光、浅景深、干净背景，冷调为主，专业可信的讲解氛围	9:16	1813833159	[{"mood": "沉稳压抑", "ratio": "9:16", "title": "深夜伏案", "prompt": "<图片 1>中的职业女性坐在深夜的办公室，桌面上散落着文件和咖啡杯，她缓缓放下揉眉心的手，目光低垂，神情疲惫。画面底部显示字幕：'每一个成功的背后，都有无数个不为人知的艰难时刻。'，配画外音旁白念出该内容。场景环境为现代办公室，冷白主光，柔和均匀，浅景深。固定镜头，电影级画面，高清，无水印，无Logo，语音音色保持全片统一", "duration": 7, "subjects": ["职业女性"], "subtitle": "每一个成功的背后，都有无数个不为人知的艰难时刻。", "description": "深夜办公室，职业女性独自坐在电脑前，揉着眉心，面前散落文件。", "shot_number": 1, "camera_movement": "固定"}, {"mood": "坚定希望", "ratio": "9:16", "title": "晨光坚持", "prompt": "<图片 1>中的职业女性在明亮通透的办公室，晨光从窗户洒入，她缓缓抬起头，眼神坚定，双手轻轻整理桌上的文件。画面底部显示字幕：'你以为别人的成功是天赋，其实是他们在你看不见的地方，默默努力了无数个日夜。'，配画外音旁白念出该内容。场景环境为现代办公室，明亮通透光，浅景深。缓慢推镜，电影级画面，高清，无水印，无Logo，语音音色保持全片统一", "duration": 11, "subjects": ["职业女性"], "subtitle": "你以为别人的成功是天赋，其实是他们在你看不见的地方，默默努力了无数个日夜。", "description": "清晨，同一女性在明亮的办公室，整理文件，眼神坚定。", "shot_number": 2, "camera_movement": "推入"}, {"mood": "反思坚定", "ratio": "9:16", "title": "失败反思", "prompt": "<图片 1>中的职业女性站在会议室白板前，微微低头沉思，右手轻触白板上的图表，然后缓缓抬头，目光坚定。画面底部显示字幕：'失败了没关系，重要的是你有没有从中学到了什么。'，配画外音旁白念出该内容。场景环境为现代会议室，冷白主光，柔和均匀，浅景深。固定镜头，电影级画面，高清，无水印，无Logo，语音音色保持全片统一", "duration": 7, "subjects": ["职业女性"], "subtitle": "失败了没关系，重要的是你有没有从中学到了什么。", "description": "会议室，职业女性面对白板，低头沉思，随后抬头。", "shot_number": 3, "camera_movement": "固定"}, {"mood": "激励奋发", "ratio": "9:16", "title": "破晓前行", "prompt": "<图片 1>中的职业女性站在城市天台，背景是晨光中的高楼，她缓缓向前迈出一步，双手撑在栏杆上，目光远眺，神情坚定。画面底部显示字幕：'人生最大的遗憾，不是努力了没有成功，而是本可以成功，却没有努力。'，配画外音旁白念出该内容。场景环境为城市天台，金色晨光，轮廓逆光，浅景深。拉出揭示，电影级画面，高清，无水印，无Logo，语音音色保持全片统一", "duration": 10, "subjects": ["职业女性"], "subtitle": "人生最大的遗憾，不是努力了没有成功，而是本可以成功，却没有努力。", "description": "城市天台，职业女性迎着晨光，眺望远方，背景高楼。", "shot_number": 4, "camera_movement": "拉出揭示"}]	[{"url": "asset://remote:asset-20260806074749-kg6rq", "name": "mee", "mediaType": "image", "previewUrl": "https://ark-media-asset-ap-southeast-1.tos-ap-southeast-1.volces.com/3002389684/080607474873037031.jpg?X-Tos-Algorithm=TOS4-HMAC-SHA256&X-Tos-Credential=REDACTED&X-Tos-Date=20260807T060238Z&X-Tos-Expires=41400&X-Tos-Security-Token=REDACTED&X-Tos-Signature=REDACTED&X-Tos-SignedHeaders=host"}]	{"seed": 1813833159, "draft": false, "model": "doubao-seedance-2-0-fast", "priority": 0, "watermark": false, "webSearch": false, "resolution": "720p", "serviceTier": "default", "subtitleMode": "on", "generateAudio": true, "returnLastFrame": false}			{"1": {"error": "API error 429", "status": "failed", "taskId": null, "videoUrl": null, "shotIndex": 1, "submitting": false}}	\N	2026-08-07 06:03:00.381709	2026-08-07 06:04:03.647746	{"shots": [{"mood": "沉稳压抑", "ratio": "9:16", "title": "深夜伏案", "prompt": "<图片 1>中的职业女性坐在深夜的办公室，桌面上散落着文件和咖啡杯，她缓缓放下揉眉心的手，目光低垂，神情疲惫。画面底部显示字幕：'每一个成功的背后，都有无数个不为人知的艰难时刻。'，配画外音旁白念出该内容。场景环境为现代办公室，冷白主光，柔和均匀，浅景深。固定镜头，电影级画面，高清，无水印，无Logo，语音音色保持全片统一", "duration": 7, "subjects": ["职业女性"], "subtitle": "每一个成功的背后，都有无数个不为人知的艰难时刻。", "description": "深夜办公室，职业女性独自坐在电脑前，揉着眉心，面前散落文件。", "shot_number": 1, "camera_movement": "固定"}, {"mood": "坚定希望", "ratio": "9:16", "title": "晨光坚持", "prompt": "<图片 1>中的职业女性在明亮通透的办公室，晨光从窗户洒入，她缓缓抬起头，眼神坚定，双手轻轻整理桌上的文件。画面底部显示字幕：'你以为别人的成功是天赋，其实是他们在你看不见的地方，默默努力了无数个日夜。'，配画外音旁白念出该内容。场景环境为现代办公室，明亮通透光，浅景深。缓慢推镜，电影级画面，高清，无水印，无Logo，语音音色保持全片统一", "duration": 11, "subjects": ["职业女性"], "subtitle": "你以为别人的成功是天赋，其实是他们在你看不见的地方，默默努力了无数个日夜。", "description": "清晨，同一女性在明亮的办公室，整理文件，眼神坚定。", "shot_number": 2, "camera_movement": "推入"}, {"mood": "反思坚定", "ratio": "9:16", "title": "失败反思", "prompt": "<图片 1>中的职业女性站在会议室白板前，微微低头沉思，右手轻触白板上的图表，然后缓缓抬头，目光坚定。画面底部显示字幕：'失败了没关系，重要的是你有没有从中学到了什么。'，配画外音旁白念出该内容。场景环境为现代会议室，冷白主光，柔和均匀，浅景深。固定镜头，电影级画面，高清，无水印，无Logo，语音音色保持全片统一", "duration": 7, "subjects": ["职业女性"], "subtitle": "失败了没关系，重要的是你有没有从中学到了什么。", "description": "会议室，职业女性面对白板，低头沉思，随后抬头。", "shot_number": 3, "camera_movement": "固定"}, {"mood": "激励奋发", "ratio": "9:16", "title": "破晓前行", "prompt": "<图片 1>中的职业女性站在城市天台，背景是晨光中的高楼，她缓缓向前迈出一步，双手撑在栏杆上，目光远眺，神情坚定。画面底部显示字幕：'人生最大的遗憾，不是努力了没有成功，而是本可以成功，却没有努力。'，配画外音旁白念出该内容。场景环境为城市天台，金色晨光，轮廓逆光，浅景深。拉出揭示，电影级画面，高清，无水印，无Logo，语音音色保持全片统一", "duration": 10, "subjects": ["职业女性"], "subtitle": "人生最大的遗憾，不是努力了没有成功，而是本可以成功，却没有努力。", "description": "城市天台，职业女性迎着晨光，眺望远方，背景高楼。", "shot_number": 4, "camera_movement": "拉出揭示"}], "shotCount": 4, "autoShotCount": 4, "characterAnchor": "一位35岁左右的职业女性，短发干练，穿深色西装外套，内搭白色衬衫，面容自信沉稳，体态端正。整体为专业商务的柔光棚拍风格，浅景深，背景干净，冷调为主，画面高清，电影级质感，光线柔和均匀，营造专业可信的讲解氛围。", "totalVideoDuration": 35}
-\.
+CREATE TABLE public.user_asset_groups (
+    id integer NOT NULL,
+    user_id integer,
+    group_id character varying(100) NOT NULL,
+    group_type character varying(20) NOT NULL,
+    name character varying(200),
+    shared boolean DEFAULT false,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: user_asset_groups_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.user_asset_groups_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: user_asset_groups_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.user_asset_groups_id_seq OWNED BY public.user_asset_groups.id;
+
+
+--
+-- Name: users; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.users (
+    id integer NOT NULL,
+    sso_user_id integer NOT NULL,
+    username character varying(50),
+    name character varying(100),
+    email character varying(200),
+    avatar text,
+    quota integer DEFAULT 10,
+    used integer DEFAULT 0,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: users_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.users_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: users_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.users_id_seq OWNED BY public.users.id;
+
+
+--
+-- Name: user_asset_groups id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_asset_groups ALTER COLUMN id SET DEFAULT nextval('public.user_asset_groups_id_seq'::regclass);
+
+
+--
+-- Name: users id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.users ALTER COLUMN id SET DEFAULT nextval('public.users_id_seq'::regclass);
 
 
 --
@@ -69,8 +151,62 @@ ALTER TABLE ONLY public.batch_tasks
 
 
 --
+-- Name: user_asset_groups user_asset_groups_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_asset_groups
+    ADD CONSTRAINT user_asset_groups_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: users users_sso_user_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_sso_user_id_key UNIQUE (sso_user_id);
+
+
+--
+-- Name: idx_user_asset_groups_shared_group; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_user_asset_groups_shared_group ON public.user_asset_groups USING btree (group_id) WHERE (shared = true);
+
+
+--
+-- Name: idx_user_asset_groups_user_group; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_user_asset_groups_user_group ON public.user_asset_groups USING btree (user_id, group_id) WHERE (user_id IS NOT NULL);
+
+
+--
+-- Name: batch_tasks batch_tasks_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.batch_tasks
+    ADD CONSTRAINT batch_tasks_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id);
+
+
+--
+-- Name: user_asset_groups user_asset_groups_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.user_asset_groups
+    ADD CONSTRAINT user_asset_groups_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id);
+
+
+--
 -- PostgreSQL database dump complete
 --
 
-\unrestrict qgzsltDbDZeILfGIAT7U4kxqZ6jCeU8H57DetIGFGCVX5IDLhRONjppooVE1Vya
+\unrestrict pz2yVvdxDsQ4xNAOVFRd3JZaa7Ysr3SGQMxeywv2SFrdjVrAtzklkw900VldVJe
 
