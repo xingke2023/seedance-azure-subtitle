@@ -41,12 +41,12 @@
 .chipActive { border-color: #0d9488; background: #0d9488; color: #ffffff; }
 .chipPill { border-radius: 9999px; }
 .chipPillActive { border-color: #0f766e; background: #0f766e; color: #fff; }
-.toggleRow { display: flex; align-items: center; gap: 10px; cursor: pointer; -webkit-tap-highlight-color: transparent; margin-bottom: 12px; }
-.toggleTrack { position: relative; width: 36px; height: 20px; border-radius: 10px; background: #d1d5db; flex-shrink: 0; }
+.toggleRow { display: flex; align-items: center; gap: 4px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.toggleTrack { position: relative; width: 28px; height: 16px; border-radius: 8px; background: #d1d5db; flex-shrink: 0; }
 .toggleTrackOn { background: #0d9488; }
-.toggleKnob { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.2); transition: transform .15s; }
-.toggleKnobOn { transform: translateX(16px); }
-.toggleLabel { font-size: 13px; color: #374151; }
+.toggleKnob { position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.2); transition: transform .15s; }
+.toggleKnobOn { transform: translateX(12px); }
+.toggleLabel { font-size: 11px; color: #374151; }
 .infoBox { background: #f0fdfa; border-radius: 6px; padding: 10px 12px; margin-top: 8px; }
 .infoText { font-size: 12px; color: #0f766e; margin: 2px 0; }
 .clearBtn { font-size: 11px; color: #9ca3af; background: none; border: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
@@ -208,7 +208,7 @@
   .select { font-size: 14px; padding: 7px 10px; }
   .textarea { font-size: 15px; padding: 10px 12px; }
   .chip { font-size: 14px; padding: 6px 12px; }
-  .toggleLabel { font-size: 14px; }
+  .toggleLabel { font-size: 12px; }
   .btnPrimary { font-size: 16px; padding: 12px 16px; }
   .btnSmTeal { font-size: 15px; }
   .shotTitle { font-size: 15px; }

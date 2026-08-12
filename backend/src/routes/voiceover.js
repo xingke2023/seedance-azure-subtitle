@@ -7,6 +7,8 @@ const crypto        = require('crypto')
 const { execFile }  = require('child_process')
 const { promisify } = require('util')
 const { jsonrepair } = require('jsonrepair')
+const sdk = require('microsoft-cognitiveservices-speech-sdk')
+const jieba = require('jieba-wasm')
 
 const { UPLOAD_ROOT, localUploadPath, fetchMediaBuffer } = require('../lib/uploads')
 
@@ -100,6 +102,98 @@ function chunkSubtitle(text, maxChars = 30) {
   return result
 }
 
+function wrapSubtitleLine(text, maxPerLine = 14) {
+  if (text.length <= maxPerLine) return text
+  // 最多2行，在词边界断开
+  const words = jieba.cut(text)
+  let line1 = '', line2 = ''
+  let onSecond = false
+  for (const word of words) {
+    if (!onSecond && line1.length + word.length > maxPerLine && line1.length > 0) {
+      onSecond = true
+    }
+    if (onSecond) {
+      line2 += word
+    } else {
+      line1 += word
+    }
+  }
+  if (!line2) return line1
+  return line1 + '\n' + line2
+}
+
+function calcMaxCharsPerLine(videoWidth, videoHeight = 1920, fontSize = 16, marginLR = 20) {
+  const scale = videoHeight / 384
+  const scaledFontSize = fontSize * scale
+  const scaledMargin = marginLR * 2 * scale
+  const availWidth = videoWidth - scaledMargin
+  const charWidth = scaledFontSize * 1.15
+  return Math.max(6, Math.floor(availWidth / charWidth))
+}
+
+function buildForceStyle(subtitleStyle = {}) {
+  const font = subtitleStyle.font || 'Noto Sans CJK SC'
+  const fontSizePct = subtitleStyle.fontSize || 4.2
+  const fontSize = Math.round(fontSizePct * 3.84)
+  const hexColor = (subtitleStyle.color || '#FFFFFF').replace('#', '')
+  const r = hexColor.slice(0, 2), g = hexColor.slice(2, 4), b = hexColor.slice(4, 6)
+  const alpha = subtitleStyle.alpha !== undefined ? subtitleStyle.alpha : 1.0
+  const alphaHex = Math.round((1 - alpha) * 255).toString(16).padStart(2, '0').toUpperCase()
+  const assColor = `&H${alphaHex}${b}${g}${r}`
+  const pos = subtitleStyle.position || 'bottom'
+  const alignment = pos === 'top' ? 8 : pos === 'center' ? 5 : 2
+  const marginV = pos === 'center' ? 10 : 50
+
+  const borderW = subtitleStyle.borderW !== undefined ? subtitleStyle.borderW : 1
+  const borderHex = (subtitleStyle.borderColor || '#000000').replace('#', '')
+  const br = borderHex.slice(0, 2), bg = borderHex.slice(2, 4), bb = borderHex.slice(4, 6)
+  const borderAlpha = subtitleStyle.borderAlpha !== undefined ? subtitleStyle.borderAlpha : 0.5
+  const borderAlphaHex = Math.round((1 - borderAlpha) * 255).toString(16).padStart(2, '0').toUpperCase()
+  const assOutlineColor = `&H${borderAlphaHex}${bb}${bg}${br}`
+
+  return `FontName=${font},FontSize=${fontSize},PrimaryColour=${assColor},OutlineColour=${assOutlineColor},BackColour=&H80000000,BorderStyle=1,Outline=${borderW},Shadow=0,Alignment=${alignment},MarginV=${marginV},MarginL=20,MarginR=20,WrapStyle=0`
+}
+
+function buildBannerFilter(bannerText, videoWidth, videoHeight, style = {}, tmpDir = null) {
+  if (!bannerText || !bannerText.trim()) return null
+  const lines = bannerText.split('\n').filter(l => l.trim())
+  if (!lines.length) return null
+  const fontFile = '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc'
+  const fallbackFont = '/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc'
+  const font = fs.existsSync(fontFile) ? fontFile : fallbackFont
+
+  const fontSizePct = style.fontSize ?? 2.8
+  const fontSize = Math.round(videoHeight * fontSizePct / 100)
+  const lineSpacing = Math.round(fontSize * 0.6)
+  const topPadding = Math.round(videoHeight * 0.06)
+
+  const hexToFF = (hex, a) => {
+    const clean = (hex || '#ffffff').replace('#', '0x')
+    return (a !== undefined && a < 1.0) ? `${clean}@${Number(a).toFixed(2)}` : clean
+  }
+
+  const fontcolor   = hexToFF(style.color ?? '#ffffff', style.alpha ?? 1.0)
+  const borderW     = style.borderW ?? 2
+  const bordercolor = hexToFF(style.borderColor ?? '#000000', style.borderAlpha ?? 0.6)
+  const shadowX     = style.shadowX ?? 0
+  const shadowY     = style.shadowY ?? 0
+  const shadowcolor = hexToFF(style.shadowColor ?? '#000000', 0.8)
+  const boxEnabled  = style.boxEnabled ?? false
+  const boxcolor    = hexToFF(style.boxColor ?? '#000000', style.boxAlpha ?? 0.5)
+
+  const dir = tmpDir || os.tmpdir()
+  const textFilePath = path.join(dir, 'banner_text.txt')
+  fs.writeFileSync(textFilePath, lines.join('\n'), 'utf8')
+
+  let f = `drawtext=textfile='${textFilePath.replace(/'/g, "'\\''")}':fontfile='${font}':fontsize=${fontSize}:fontcolor=${fontcolor}`
+  f += `:line_spacing=${lineSpacing}`
+  f += `:borderw=${borderW}:bordercolor=${bordercolor}`
+  if (shadowX > 0 || shadowY > 0) f += `:shadowx=${shadowX}:shadowy=${shadowY}:shadowcolor=${shadowcolor}`
+  if (boxEnabled) f += `:box=1:boxcolor=${boxcolor}:boxborderw=8`
+  f += `:x=(w-text_w)/2:y=${topPadding}`
+  return f
+}
+
 // 在标点符号处断句（完整句子不拆开）
 function splitAtPunctuation(text) {
   const sentences = []
@@ -117,6 +211,83 @@ function splitAtPunctuation(text) {
   return sentences.filter(s => s.length > 0)
 }
 
+function jiebaSegmentSubtitle(text, maxPerLine) {
+  const maxChars = maxPerLine * 2
+
+  // 1. 先在标点处强制断句（标点断句不合并）
+  const sentences = splitAtPunctuation(text)
+  const cleaned = sentences.map(s => s.replace(/[。！？…；，、,;.!?：:\s]+/g, '')).filter(s => s.length > 0)
+
+  // 2. 超长句用 jieba 再切，jieba 产生的过短段可合并
+  const segments = []
+  for (const sent of cleaned) {
+    if (sent.length <= maxChars) {
+      segments.push(sent)
+    } else {
+      const words = jieba.cut(sent)
+      const subs = []
+      let current = ''
+      let remaining = sent.length
+      for (const word of words) {
+        remaining -= word.length
+        if (current.length + word.length > maxChars && current.length > 0 && remaining >= 4) {
+          subs.push(current)
+          current = word
+        } else {
+          current += word
+        }
+      }
+      if (current) subs.push(current)
+      // 只在同一句内合并过短的 jieba 子段
+      for (let i = 0; i < subs.length; i++) {
+        if (subs[i].length < 4 && i > 0 && segments[segments.length - 1].length + subs[i].length <= maxChars) {
+          segments[segments.length - 1] += subs[i]
+        } else if (subs[i].length < 4 && i + 1 < subs.length && subs[i].length + subs[i + 1].length <= maxChars) {
+          subs[i + 1] = subs[i] + subs[i + 1]
+        } else {
+          segments.push(subs[i])
+        }
+      }
+    }
+  }
+
+  console.log('[jiebaSegment] 成功', { total: text.length, segments: segments.length, maxChars })
+  return segments
+}
+
+// 用 wordBoundaries 精确计算每个字幕段的起止时间
+function alignSegmentsWithWordBoundaries(segments, wordBoundaries) {
+  if (!wordBoundaries || !wordBoundaries.length) return null
+
+  const wbClean = wordBoundaries.filter(w => w.text && w.text.trim()).map(w => ({
+    text: w.text.replace(/[。！？…；，、,;.!?：:\s]+/g, ''),
+    offset: w.offset,
+    duration: w.duration,
+  })).filter(w => w.text.length > 0)
+
+  const result = []
+  let wbIdx = 0
+
+  for (const seg of segments) {
+    let matched = 0
+    const startWbIdx = wbIdx
+    while (matched < seg.length && wbIdx < wbClean.length) {
+      const wb = wbClean[wbIdx]
+      matched += wb.text.length
+      wbIdx++
+    }
+    if (startWbIdx < wbClean.length) {
+      const startTime = wbClean[startWbIdx].offset
+      const lastWb = wbClean[Math.min(wbIdx - 1, wbClean.length - 1)]
+      const endTime = lastWb.offset + lastWb.duration
+      result.push({ text: seg, start: startTime, end: endTime })
+    } else {
+      result.push({ text: seg, start: 0, end: 0 })
+    }
+  }
+  return result
+}
+
 function buildSRT(videos, videoDurs) {
   const lines = []
   let idx = 1
@@ -129,8 +300,7 @@ function buildSRT(videos, videoDurs) {
       const totalChars = chunks.reduce((sum, c) => sum + c.length, 0)
       let chunkOffset = offset
       chunks.forEach(chunk => {
-        const chunkDur = dur * (chunk.length / totalChars)
-        const display = chunk.replace(/[。！？…；，、,;.!?：:]+$/, '')
+        const display = wrapSubtitleLine(chunk.replace(/[。！？…；，、,;.!?：:]+$/, ''))
         lines.push(`${idx++}`)
         lines.push(`${toSRTTime(chunkOffset)} --> ${toSRTTime(chunkOffset + chunkDur)}`)
         lines.push(display)
@@ -153,6 +323,18 @@ async function probeDuration(filePath) {
   return parseFloat(r.stdout.trim()) || 0
 }
 
+async function probeWidth(filePath) {
+  const r = await execFileAsync('ffprobe', [
+    '-v', 'error',
+    '-select_streams', 'v:0',
+    '-show_entries', 'stream=width,height',
+    '-of', 'csv=p=0',
+    filePath,
+  ])
+  const [w, h] = r.stdout.trim().split(',').map(Number)
+  return { width: w || 0, height: h || 0 }
+}
+
 function escapeXml(str) {
   return (str || '').replace(/[<>&'"]/g, c => (
     { '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[c]
@@ -171,128 +353,112 @@ async function generateVoiceoverShots(script, suggestedCount, style, ratio, medi
   // subtitleInput provided → distribute exact text; empty → AI auto-generates narration
   const hasUserSubtitle = !!(subtitleInput && subtitleInput.trim())
 
-  const systemMsg = `你是专业的视频导演和分镜脚本师，擅长把视频需求转化为可直接喂给 Seedance 2.0 视频模型的高质量分镜提示词。你精通 Seedance 2.0 的提示词优化公式和最佳实践。
 
-【Seedance 2.0 提示词公式（核心）】
-每段 prompt 结构分为必须项和可选项：
+  const systemMsg = `你是专业电影分镜导演，任务是把视频需求转化为一组有叙事深度的 Seedance 2.0 分镜提示词。
 
-必须项（每段都要有）：
-  精准主体 + 动作细节
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+【第一步：规划角色与故事弧线（生成任何分镜之前必须先做）】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+拿到视频需求后，先在脑海中完成：
 
-可选项（根据需要添加，可提升画面质感）：
-  场景环境 + 光影色调 + 镜头运镜 + 视觉风格 + 画质 + 约束条件
+① 角色设计：出场的人物有哪些？每个人物的外貌特征、性格、在故事中的角色/处境是什么？
+② 故事弧线：这组分镜要讲一个什么故事？
+   - 开幕：什么情境/冲突引入故事？
+   - 发展：主角经历了什么转变/挣扎/行动？
+   - 结尾：如何收尾，留下什么感受？
+③ 场景规划：需要几个不同的地点/时间段/环境？每个场景承担什么叙事功能？
+④ 情节设计：故事中的关键事件/转折点是什么？每个分镜处于哪个叙事阶段？
 
-- 精准主体：用外貌特征定义人物（年龄/性别/发型/服装/体态），不使用人名。${imageCount + videoCount > 0 ? '如有参考素材，用「<图片 N>」格式锚定外貌，如"<图片 1>中的女性"。' : ''}
-- 动作细节：描述具体身体部位的缓慢连续动作（手臂/头部/躯干/腿部分别怎么动），动作幅度要小、速度要慢——Seedance 擅长缓慢优雅的连续动作，不擅长快速/剧烈/多步骤动作。把情绪外化为可视动作（不说"感到忧虑"，改说"眉头微蹙，双手无意识地攥紧文件"）。
-- 场景环境（可选）：具体的空间场景（不是抽象概念），包含道具、背景元素、空间纵深。
-- 光影色调（可选）：一种光影氛围（柔光/侧光/逆光/金色暖光/冷白光等），全片保持统一基调。
-- 镜头运镜（可选）：一种运镜方式（推入/拉出/环绕/横移/升降/固定），每段只用一种。
-- 视觉风格（可选）：电影质感/纪录片风/广告风等。
-- 画质（可选）：高清、4K、电影级画面等。
-- 约束条件（可选）：末尾加上"无水印，无Logo"等约束。
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+【第二步：每个分镜的四层叙事（缺任何一层为不合格）】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+【A 前景主体层】人物/主体是谁、正在做什么、动作细节到身体部位
+  - 拆解到身体部位：不写"她在思考"，写"右手食指轻触太阳穴，目光微微上移，嘴唇微张"
+  - 动作有弧度：描述开始→过程变化→结束姿态，不是静止瞬间
+  - 情绪外化为行为：不写"他很焦虑"，写"他将合同翻到最后一页，停顿，食指快速翻回第一页重看一遍"
+【B 背景环境层】场景里同时存在的具体元素（至少2个道具/背景细节）
+  - 具体道具：名字+状态（"凉透的咖啡杯"不是"杯子"；"积满灰的奖杯"不是"奖品"）
+  - 背景行为：其他人物在做什么、屏幕显示什么、窗外发生什么
+  - 空间纵深：前景/中景/背景各有内容
+【C 隐喻信息层】画面中什么细节在暗示更深的意义
+  - 道具隐喻：空置的椅子暗示离开、未接来电暗示压力、半开的门暗示选择
+  - 时间信息：天光颜色/时钟/日历/影子长度暗示时间推移
+  - 对比叙事：主角的状态与背景环境形成对比或呼应
+【D 运动光影层】镜头运动如何配合情绪，光影如何强化叙事
+  - 运镜选一种并说清方向速度：不写"推入"，写"从桌面文件特写缓慢推入至人物侧脸"
+  - 光影说具体：不写"柔光"，写"左侧单一冷白主光，右侧深阴影，人物轮廓与背景分离"
 
-【每段只做一件事（最重要）】
-- Seedance 单段最适合「一个镜头一件事」：一段里只安排 ONE 个主体动作（如"缓慢转身"）或 ONE 个运镜（如"缓慢推镜"）——二选一为主，不要在一段里塞多种景别、多个动作。
-- 动作要求：慢速、连续、小幅度。避免快速切换、跳跃、旋转等剧烈动作。好的动作示例："缓缓抬起右手翻开文件夹"、"微微侧头目光转向窗外"、"双手轻轻合拢放在桌面"。
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+【第三步：场景多样性（强制规则，违反为不合格）】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. 严禁连续2个分镜使用同一地点/场景类型
+2. 全片场景必须覆盖至少3种以下类型：
+   A. 人物情绪特写（面部/手部/局部肢体，填满画面）
+   B. 室内叙事场景（有具体道具和背景故事的室内空间）
+   C. 户外/城市/自然（街道/航拍/公园/天空）
+   D. 空镜B-roll（无主角，用环境/道具/群体画面推进叙事）
+   E. 象征/隐喻（时钟/数字/植物/光影/对比构图）
+3. 每4个分镜中至少1个纯空镜/B-roll（无主角入画）
+4. 禁止用"人物坐桌前朝镜头微笑/点头"超过1次
 
-【动作描写要点（Seedance 2.0 专项）】
-- 拆解到身体部位：不写"她在思考"，改写"她右手食指轻触太阳穴，目光微微上移，嘴唇微张"
-- 缓慢连续优先：所有动作默认慢速执行，用"缓缓""轻轻""慢慢"修饰
-- 情绪外化：把内心状态转化为外在动作/表情/肢体语言
-- 单一动作链：一段只描述一个连贯动作序列（开始→过程→结束姿态），不跳切
-- 避免的动作类型：奔跑、跳跃、快速转身、打斗、舞蹈、复杂手势
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+【技术规范（全部为必须项，没有可选）】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+- 主体描述：每段 prompt 开头必须重新描述主体外貌（年龄/性别/发型/服装/体态），不得用"主角""他""她"等代词代替，不使用人名。${imageCount + videoCount > 0 ? '有参考素材时用「<图片 N>中的...」格式锚定。' : ''}
+- 景别节奏：相邻段景别交替变化（全景→中景→特写→空镜→特写...）
+- 运镜多样：避免连续2段同向运镜，之间插固定镜头或反向运镜
+- 光影统一：全片统一光影基调，每段用具体方向/颜色/强度描述
+- 末尾约束：每段 prompt 末尾必须加"无水印，无Logo"
+- prompt 长度：每段 150-220字，禁止用泛化词（"干净背景""整洁办公室""明亮环境"）代替具体场景描写
+${imageCount + videoCount > 0 || subjectDefinitions.trim() ? '- 素材引用：每段都用「<图片 N>中的...」引用参考素材锚定人物外貌，防止 ID 漂移' : imageCount + videoCount === 0 && !subjectDefinitions.trim() ? '- 禁止出现「<图片 N>」「<视频 N>」等素材引用标记（本次无参考素材）' : ''}
 
-${hasUserSubtitle ? `【台词归组与分段（字幕层，严禁修改原文）】
-1. 按视觉场景智能归组台词——同一地点/情绪/论点的多句台词归入同一分镜，subtitle 可含多句；但该段 prompt 只表现这组台词的「一个核心动作瞬间」。
-2. ⚠️ 所有分镜 subtitle 拼接后必须逐字逐句100%等于用户提供的视频字幕原文。严禁改写、概括、增删任何字词标点。
-3. 尽量让每个分镜多承载字幕内容（单个分镜最多约 15 秒 ≈ ~52个中文字），减少分镜总数。只有在视觉场景需要切换时才拆分新镜头，不要因为字幕稍长就拆分。
-4. 禁止把单句话拆成多个分镜。
-5. 只允许在句子边界（句号、问号、感叹号、省略号）处断开，不得在句子中间切割。` : `【字幕自动生成（重要）】
-1. 用户未提供视频字幕，你必须根据视频需求自动生成合适的旁白/解说词，填入每个分镜的 subtitle 字段。
-2. 生成的字幕要贴合视频需求的主题和内容，语言自然流畅，适合作为画外音旁白。
-3. 每个分镜都必须有 subtitle（不允许留空），每段字幕约 15-50 个中文字。
-4. 全部分镜的字幕拼接后应构成一段完整、连贯的解说/旁白。`}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+【✅ 合格 prompt 示例（必须达到这个丰富程度）】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+示例A（叙事转折镜头）：
+"35岁男性，短发略显凌乱，深蓝色西装领带松开，站在办公室落地窗前，窗外是阴天城市天际线，铅灰色云层低压。他左手持一份厚达数十页的合同，右手拇指缓缓摩挲文件边缘，视线从最后一页缓缓抬起移向窗外，眉头微蹙，嘴角轻抿。背景虚化处：会议室长桌上散落着其他合同文件，空置的椅子仍留有坐过的压痕，白板上'Q3目标'数字被划掉重写了两次。左侧冷白主光将人物轮廓从灰暗背景中分离，右脸深阴影。固定镜头缓缓推入，从合同页边特写起，终止于人物疲惫侧脸。电影级4K画面，无水印，无Logo。"
 
-【每格都要有一个具体的故事场景（重要）】
-- 每个分镜都是一个具体的故事画面：有明确的地点、人物和正在发生的情境/动作，把台词的含义"演"成一个生活片段或故事瞬间，而不是抽象说教。
-- 把抽象概念落成生活情景。例：把"社保不够"演成"老人对着一叠账单发愁"；把"及早规划"演成"年轻夫妻在台灯下一起记账"；把"复利增长"演成"小树苗长成大树/存钱罐一天天变满"。
-- 全片场景要有跨度：不同地点、场合、时间、人物关系交替（家庭客厅 / 职场 / 户外 / 医院 / 银行 / 街道等）。
-- 主角不必每格都居中出现，可让场景里的人物与情境来承接旁白。
+示例B（空镜叙事镜头）：
+"城市金融区俯拍，清晨6:45分，写字楼大堂玻璃门外排队等候的西装人群，每人手持咖啡杯或手机，面朝同一方向，背包和公文包整齐悬挂。地面积水倒映着写字楼玻璃幕墙，反射的人影在水中轻微颤动。门卫刚刷开大堂，人群开始缓缓涌入，第一排的人低头看手机，后排的人踮脚望向门口。早晨冷蓝色天光从左侧照入，玻璃幕墙反射出对面楼宇灯光。摄影机缓慢下降，从俯拍全景降至人群头顶高度。纪录片质感，高清，无水印，无Logo。"
 
-【段与段衔接】
-- 动作衔接：本段结尾动作与下段开头动作在逻辑上要能接上。
-- 景别节奏：相邻段用景别变化带节奏，如 全景→中景→特写；避免连续两段同一景别。
-- 运镜衔接：避免连续两段同向运镜；之间插一段固定镜头或反向运镜。
+❌ 不合格示例（禁止产出）：
+"男性坐在办公桌前翻看文件，神情专注，背景是干净明亮的办公室，柔光，推入镜头，高清，无水印，无Logo。"（无叙事层次，场景泛化，无具体细节）
 
-【镜头运动库（camera_movement 字段值，并在 prompt 中用中文写出）】
-- 推入 Push-in：缓慢推近主体，强调情绪或细节
-- 拉出揭示 Pull-back Reveal：拉远交代环境全貌
-- 环绕 Orbit：绕主体旋转展示
-- 固定 Static：稳定构图不动，专注内容
-- 跟随横移 Track：平滑跟随移动
-- 升降 Crane/Rise：垂直升降展示规模感
-- 摇镜 Pan：水平转动拍摄场景
-- 俯拍下移 Top-down：从上方俯瞰向下拍摄
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${hasUserSubtitle ? `【字幕分配规则（严禁修改原文）】
+1. 按视觉场景归组台词——同一地点/情绪的多句台词合入同一分镜，prompt 用四层叙事充分表现
+2. 所有分镜 subtitle 拼接后必须逐字逐句100%等于原文，严禁改写、增删任何字词标点
+3. 单个分镜最多约15秒（≈52字），只有视觉场景需要切换时才拆分，不因字幕稍长就拆
+4. 禁止把单句话拆成多个分镜；只在句子边界（句号/问号/感叹号/省略号）处断开` : `【字幕生成规则】
+1. 根据视频需求自动生成旁白/解说词，填入每个分镜的 subtitle 字段
+2. 字幕语言自然流畅，贴合主题，适合作为画外音；每段约15-50字，不可留空
+3. 全部分镜字幕拼接后构成一段完整连贯的解说/旁白`}
 
-【光影色调库（在 prompt 中点明一个，全片基调统一）】
-- 柔和自然光：均匀柔光、浅景深——专业信任感
-- 暖色侧光/金色光：温馨氛围——家庭/传承主题
-- 冷白主光：高端冷静——商务/理财主题
-- 明亮通透光：自然光、通透——日常生活场景
-- 轮廓逆光：主体轮廓光、深色背景——人物强调
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+【输出格式（纯JSON，不含任何其他文字或代码块标记）】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{
+  "story_arc": "一句话描述本组分镜的叙事弧线（开篇情境→核心冲突→结尾落点）",
+  "character_anchor": "全片视觉锚点（80-120字）：所有出场角色的外貌描述 + 视觉风格 + 画质词 + 主导光影色调，不写固定地点",
+  "shots": [
+    {
+      "shot_number": 1,
+      "narrative_stage": "开幕/铺垫/发展/转折/高潮/结尾（选一个）",
+      "title": "分镜标题（8字以内）",
+      "subtitle": "${hasUserSubtitle ? '该分镜对应的字幕原文精确子串，严禁修改' : '自动生成的旁白解说词（15-50字）'}",
+      "description": "本格叙事功能（30字以内）：这个镜头推进了什么——处境变化/情绪转折/信息揭示",
+      "prompt": "Seedance 2.0 提示词（150-220字，必须包含四层叙事：A前景主体+B背景环境+C隐喻信息+D运动光影）${imageCount + videoCount > 0 || subjectDefinitions.trim() ? '，用<图片N>引用参考素材' : ''}",
+      "duration": "秒数（整数，ceil(subtitle字数/3.5)，范围4-15）",
+      "ratio": "${ratio}",
+      "camera_movement": "镜头运动（中文，描述方向和速度，如：从文件特写缓慢推入至人物侧脸）",
+      "mood": "情绪基调（中文）",
+      "subjects": []
+    }
+  ]
+}
 
-【首镜钩子（仅 shot_number=1）】
-第一个分镜承担「留住观众」职责：用一个引发好奇或共鸣的动作/构图作为钩子，专业克制不浮夸。
-${imageCount + videoCount > 0 || subjectDefinitions.trim() ? `
-【素材引用规则（重要）】
-如果用户提供了参考素材，必须在 prompt 中使用"<素材类型 N>"格式引用：
-- 「<图片 1>」指代 content 数组中第1个 type="image_url" 的参考图片
-- 「<图片 2>」指代第2个参考图片，以此类推
-- 「<视频 1>」指代第1个参考视频
-- 引用格式示例："<图片 1>中的短发女性缓缓转过身来，面带微笑..."
-- 每个分镜都应引用素材来锚定人物外貌，防止 ID 漂移（换脸/变装）
+JSON字段中英文双引号必须转义为\\"，只输出纯JSON对象。`
 
-【prompt 写法范例（参考格式，不要直接照搬内容）】
-- 开头声明素材角色："<图片 1>中的红衣女子作为主角，<图片 2>作为场景参考"
-- 每段锚定主体："女孩<图片 1>缓缓转头望向窗外，右手轻放在桌面..."
-- 如有台词用花括号标注：角色说{台词内容}
-- 结尾加全局约束："全程画面高清电影质感，色调统一，人物面部稳定不变形，动作自然流畅"
-` : ''}
-【防止常见问题】
-${imageCount + videoCount > 0 ? '- 防 ID 漂移：每段都重复引用参考素材「<图片 N>」来锚定人物外貌\n' : ''}- 防水印：每段末尾必须加"无水印，无Logo"
-- 防风格漂移：全片使用统一的光影色调描述词
-- 防双胞胎问题：同一场景如有多人，用具体外貌特征区分（不要只写"两个人"）
-- 防动作失真：避免高速/复杂动作，动作幅度小、速度慢
-${imageCount + videoCount === 0 && !subjectDefinitions.trim() ? '- 禁止出现「<图片 N>」「<视频 N>」等素材引用标记（本次无参考素材）\n' : ''}
-
-【风格锚点（写进 character_anchor 字段，勿在各段 prompt 重复）】
-在 character_anchor 定义全片统一视觉锚点：主角形象（年龄/性别/发型/服装/体态）+ 视觉风格（电影质感/纪录片风/广告风等）+ 画质词（高清、4K、电影级画面）+ 主导光影色调。
-⚠️ character_anchor 只锁「人物外貌 + 画风 + 色调 + 画质」，绝不写固定地点或场景。
-
-【时长估算（后续会被 TTS 实际时长覆盖）】
-- 中文TTS约每秒3.5字，时长 = ceil(字数/3.5)，最少4秒，最多15秒
-
-【重要：JSON转义规则】
-- 所有字段值中的英文双引号 " 必须转义为 \\"
-- 不得使用任何 markdown 代码块标记
-- 只输出一个纯 JSON 对象，不包含任何其他文字
-
-【输出格式】
-严格输出纯JSON对象（非数组），包含：
-- character_anchor: 全片视觉锚点（中文，80-120字）：主角外貌描述（年龄/性别/发型/服装/体态）+ 视觉风格 + 画质词（高清、电影级画面）+ 主导光影色调（不要写固定地点/场景）
-- shots: 分镜数组，每个元素包含：
-  - shot_number: 编号（从1开始）
-  - title: 分镜标题（中文，8字以内）
-  - subtitle: ${hasUserSubtitle ? '该分镜对应的视频字幕原文（可多句，必须是原文精确子串，严禁修改、重写或概括）' : '根据视频需求自动生成的旁白/解说词（15-50字，不可留空）'}
-  - description: 本格的具体故事场景（中文，30字以内：地点+人物+正在发生的情境/动作）
-  - prompt: Seedance 2.0 视频提示词（中文，60-120字）。必须包含：精准主体 + 动作细节。可选添加：场景环境、光影色调、运镜方式、视觉风格、画质、约束条件。${imageCount + videoCount > 0 || subjectDefinitions.trim() ? '如有素材引用则用「<图片 N>中的...」格式开头。' : ''}${subjectDefinitions.trim() ? '如有已定义主体，prompt 中必须使用已定义的主体标签。' : ''}
-  - duration: 预估时长（秒，整数，ceil(subtitle字数/3.5)，范围4-15）
-  - ratio: 画面比例（使用用户指定比例）
-  - camera_movement: 镜头运动（从镜头运动库中选择，中文标注）
-  - mood: 情绪基调（中文）
-  - subjects: 本分镜出场的主体标签数组（如 ["主体1", "主体2"]），从已定义的主体中选择本镜头需要出现的主体。如果没有定义主体则为空数组 []
-
-只输出纯JSON对象，不包含任何其他文字或代码块标记。`
 
   let mediaHint = ''
   if (imageCount + videoCount + audioCount > 0) {
@@ -323,14 +489,14 @@ ${imageCount + videoCount === 0 && !subjectDefinitions.trim() ? '- 禁止出现�
 要求：
 - 视觉风格：${style || '根据内容自动判断最合适的风格'}
 - 画面比例：${ratio}
-- 建议分镜数量：约 ${suggestedCount} 个（优先按视觉场景分组，可 ±2 调整）${mediaHint}${hasUserSubtitle ? '\n- 字幕文本必须100%完整覆盖到各分镜的subtitle字段中，每个分镜尽量多承载字幕（单个分镜最多约15秒≈52字），只有视觉场景需要切换时才拆分' : '\n- 每个分镜必须生成字幕（subtitle不可为空），参考视频需求内容自动生成合适的旁白/解说词'}
+- 建议分镜数量：约 ${suggestedCount} 个（优先按叙事节奏分段，可 ±2 调整）${mediaHint}${hasUserSubtitle ? '\n- 字幕文本必须100%完整覆盖到各分镜的subtitle字段中，每个分镜尽量多承载字幕（单个分镜最多约15秒≈52字），只有叙事场景需要切换时才拆分' : '\n- 每个分镜必须生成字幕（subtitle不可为空），根据视频需求自动生成合适的旁白/解说词'}
 
-请严格按 Seedance 2.0 提示词公式生成每段 prompt：
-1. 先定义 character_anchor（人物外貌+视觉风格+画质词+光影色调，不写地点）
-2. 每段 prompt 必须包含：精准主体（外貌特征${imageCount > 0 || subjectDefinitions.trim() ? '，引用<图片 N>锚定' : ''}）+ 具体身体部位的缓慢动作。可选添加场景环境、光影色调、运镜等提升画面质感
-3. 动作必须是缓慢连续的小幅度动作，拆解到身体部位描写
-4. 相邻段在动作/景别/运镜上自然衔接
-5. 首镜加一个克制的视觉钩子${imageCount > 0 || subjectDefinitions.trim() ? '\n6. 每段都要用「<图片 N>中的...」格式引用参考素材，防止人物 ID 漂移' : ''}${subjectHint}`
+按照导演思维完成以下步骤再输出JSON：
+1. 先规划角色：出场人物各自的外貌、身份、处境
+2. 再规划故事弧线：开篇冲突 → 中段发展 → 结尾落点
+3. 设计场景序列：哪些地点/时间/环境承担哪些叙事功能
+4. 为每个分镜写四层叙事（前景主体+背景环境+隐喻信息+运动光影），prompt 150-220字
+5. 输出 story_arc + character_anchor + shots 的JSON${imageCount > 0 || subjectDefinitions.trim() ? '\n6. 每段都要用「<图片 N>中的...」格式引用参考素材，防止人物 ID 漂移' : ''}${subjectHint}`
 
   const res = await fetch(`${baseUrl}/v1/chat/completions`, {
     method: 'POST',
@@ -338,7 +504,7 @@ ${imageCount + videoCount === 0 && !subjectDefinitions.trim() ? '- 禁止出现�
     body: JSON.stringify({
       model,
       messages: [{ role: 'system', content: systemMsg }, { role: 'user', content: userMsg }],
-      temperature: 0.75,
+      temperature: 0.9,
       max_tokens: 8192,
     }),
     signal: AbortSignal.timeout(60_000),
@@ -702,7 +868,7 @@ async function voiceoverRoutes(fastify) {
     }
   })
 
-  // ── TTS: 生成整条语音，测量实际时长，按字数分配各分镜时长 ──────────────────
+  // ── TTS: 生成整条语音 + 逐词时间戳 ──────────────────
   fastify.post('/tts', {
     schema: {
       body: {
@@ -731,32 +897,35 @@ async function voiceoverRoutes(fastify) {
     try {
       fs.mkdirSync(UPLOAD_DIR, { recursive: true })
 
-      const tokenRes = await fetch(
-        `https://${azureRegion}.api.cognitive.microsoft.com/sts/v1.0/issueToken`,
-        { method: 'POST', headers: { 'Ocp-Apim-Subscription-Key': azureKey } }
-      )
-      if (!tokenRes.ok) throw new Error(`Azure TTS Token 获取失败：HTTP ${tokenRes.status}`)
-      const token = await tokenRes.text()
-
-      const ssml = `<speak version='1.0' xml:lang='zh-CN'><voice name='${voice}'>${escapeXml(script)}</voice></speak>`
-      const ttsRes = await fetch(
-        `https://${azureRegion}.tts.speech.microsoft.com/cognitiveservices/v1`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/ssml+xml',
-            'X-Microsoft-OutputFormat': 'audio-48khz-96kbitrate-mono-mp3',
-          },
-          body: ssml,
-          signal: AbortSignal.timeout(60_000),
-        }
-      )
-      if (!ttsRes.ok) throw new Error(`TTS 合成失败：HTTP ${ttsRes.status}`)
-
       const audioName = `voiceover-tts-${Date.now()}.mp3`
       const audioPath = path.join(UPLOAD_DIR, audioName)
-      fs.writeFileSync(audioPath, Buffer.from(await ttsRes.arrayBuffer()))
+
+      const speechConfig = sdk.SpeechConfig.fromSubscription(azureKey, azureRegion)
+      speechConfig.speechSynthesisOutputFormat = sdk.SpeechSynthesisOutputFormat.Audio48Khz96KBitRateMonoMp3
+      const audioConfig = sdk.AudioConfig.fromAudioFileOutput(audioPath)
+      const synthesizer = new sdk.SpeechSynthesizer(speechConfig, audioConfig)
+
+      const wordBoundaries = []
+      synthesizer.wordBoundary = (s, e) => {
+        wordBoundaries.push({
+          text: e.text,
+          offset: e.audioOffset / 10000000,
+          duration: e.duration / 10000000,
+        })
+      }
+
+      const ssml = `<speak version='1.0' xml:lang='zh-CN'><voice name='${voice}'>${escapeXml(script)}</voice></speak>`
+
+      const result = await new Promise((resolve, reject) => {
+        synthesizer.speakSsmlAsync(ssml,
+          r => { synthesizer.close(); resolve(r) },
+          err => { synthesizer.close(); reject(new Error(err)) },
+        )
+      })
+
+      if (result.reason !== sdk.ResultReason.SynthesizingAudioCompleted) {
+        throw new Error(`TTS 合成失败: ${sdk.ResultReason[result.reason]}`)
+      }
 
       const totalDuration = await probeDuration(audioPath)
       if (!totalDuration || totalDuration <= 0) throw new Error('无法读取语音时长')
@@ -764,12 +933,10 @@ async function voiceoverRoutes(fastify) {
       const charCounts = shots.map(s => (s.subtitle || '').replace(/\s/g, '').length)
       const totalChars = charCounts.reduce((a, b) => a + b, 0) || 1
 
-      // 分配时长：保证 sum(shotDurations) >= totalDuration（视频不能比语音短）
       let shotDurations = charCounts.map(chars => {
         const raw = totalDuration * (chars / totalChars)
         return Math.max(4, Math.ceil(raw))
       })
-      // 如果总和仍然小于音频时长（不太可能，因为 ceil 向上取整），补到最长的分镜
       let videoDurSum = shotDurations.reduce((a, b) => a + b, 0)
       if (videoDurSum < Math.ceil(totalDuration)) {
         const deficit = Math.ceil(totalDuration) - videoDurSum
@@ -786,6 +953,7 @@ async function voiceoverRoutes(fastify) {
           totalDuration,
           shotDurations,
           totalVideoDuration: shotDurations.reduce((a, b) => a + b, 0),
+          wordBoundaries,
         },
       }
     } catch (err) {
@@ -813,11 +981,31 @@ async function voiceoverRoutes(fastify) {
           audioUrl: { type: 'string' },
           voice:    { type: 'string' },
           subtitle: { type: 'string' },
+          subtitleStyle: {
+            type: 'object',
+            properties: {
+              font:     { type: 'string' },
+              fontSize: { type: 'number' },
+              color:    { type: 'string' },
+              position: { type: 'string' },
+            },
+          },
+          banner: { type: 'string', maxLength: 500 },
+          bannerStyle: {
+            type: 'object',
+            properties: {
+              fontSize: { type: 'number' }, color: { type: 'string' }, alpha: { type: 'number' },
+              borderW: { type: 'number' }, borderColor: { type: 'string' }, borderAlpha: { type: 'number' },
+              shadowX: { type: 'number' }, shadowY: { type: 'number' }, shadowColor: { type: 'string' },
+              boxEnabled: { type: 'boolean' }, boxColor: { type: 'string' }, boxAlpha: { type: 'number' },
+            },
+          },
+          wordBoundaries: { type: 'array', items: { type: 'object', properties: { text: { type: 'string' }, offset: { type: 'number' }, duration: { type: 'number' } } } },
         },
       },
     },
   }, async (request, reply) => {
-    const { videos, audioUrl, voice, subtitle: fullSubtitle } = request.body
+    const { videos, audioUrl, voice, subtitle: fullSubtitle, subtitleStyle, banner, bannerStyle = {}, wordBoundaries } = request.body
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'voiceover-merge-'))
 
     try {
@@ -864,51 +1052,40 @@ async function voiceoverRoutes(fastify) {
       const videoTotal = videoDurs.reduce((a, b) => a + b, 0)
       const gap = audioDur - videoTotal
 
-      // ── 4. 生成 SRT（只在标点处断句，每个分镜音频 < 视频时长）──────────────
+      // ── 4. 生成 SRT（AI 断句 → 回退机械断句）──────────────
+      const { width: videoWidth, height: videoHeight } = await probeWidth(videoPaths[0])
+      const assFontSize = Math.round(((subtitleStyle && subtitleStyle.fontSize) || 4.2) * 3.84)
+      const maxPerLine = calcMaxCharsPerLine(videoWidth || 720, videoHeight || 1280, assFontSize)
       let srtContent = null
       const fullText = (fullSubtitle || '').trim() || validVideos.map(v => (v.subtitle || '').trim()).join('')
       if (fullText) {
-        const sentences = splitAtPunctuation(fullText)
-        const totalChars = sentences.reduce((a, s) => a + s.length, 0) || 1
+        let segments = jiebaSegmentSubtitle(fullText, maxPerLine)
 
-        // 按字数比例估算每个句子的音频时长
-        const sentenceDurs = sentences.map(s => audioDur * (s.length / totalChars))
+        // 用 wordBoundaries 精确对齐，否则按字数比例
+        const aligned = alignSegmentsWithWordBoundaries(segments, wordBoundaries)
 
-        // 贪心分配：累计句子到当前分镜，直到加下一句会超过视频时长
-        const shotSentences = videoDurs.map(() => [])
-        let shotIdx = 0, shotAccum = 0
-        for (let i = 0; i < sentences.length; i++) {
-          const sDur = sentenceDurs[i]
-          // 如果当前分镜加上这句会超限，且当前分镜已有内容，则移到下一个分镜
-          if (shotAccum + sDur > videoDurs[shotIdx] && shotAccum > 0 && shotIdx < videoDurs.length - 1) {
-            shotIdx++
-            shotAccum = 0
-          }
-          shotSentences[shotIdx].push({ text: sentences[i], dur: sDur })
-          shotAccum += sDur
-          // 如果当前分镜已满且还有下一个分镜，切换
-          if (shotAccum >= videoDurs[shotIdx] && shotIdx < videoDurs.length - 1) {
-            shotIdx++
-            shotAccum = 0
-          }
-        }
-
-        // 生成 SRT：按分镜偏移 + 句子时长
         const srtLines = []
-        let srtIdx = 1, timeOffset = 0
-        for (let si = 0; si < shotSentences.length; si++) {
-          for (const { text, dur } of shotSentences[si]) {
-            // 字幕行再按显示长度拆分（不超过30字/行），但时间不拆
-            const displayChunks = chunkSubtitle(text, 30)
-            const chunkDur = dur / displayChunks.length
-            for (const chunk of displayChunks) {
-              const display = chunk.replace(/[。！？…；，、,;.!?：:]+$/, '')
-              srtLines.push(`${srtIdx++}`)
-              srtLines.push(`${toSRTTime(timeOffset)} --> ${toSRTTime(timeOffset + chunkDur)}`)
-              srtLines.push(display)
-              srtLines.push('')
-              timeOffset += chunkDur
-            }
+        let srtIdx = 1
+        if (aligned && aligned.some(a => a.end > 0)) {
+          for (const { text, start, end } of aligned) {
+            if (end <= start) continue
+            const display = wrapSubtitleLine(text, maxPerLine)
+            srtLines.push(`${srtIdx++}`)
+            srtLines.push(`${toSRTTime(start)} --> ${toSRTTime(end)}`)
+            srtLines.push(display)
+            srtLines.push('')
+          }
+        } else {
+          const totalChars = segments.reduce((a, s) => a + s.length, 0) || 1
+          let timeOffset = 0
+          for (const seg of segments) {
+            const dur = audioDur * (seg.length / totalChars)
+            const display = wrapSubtitleLine(seg, maxPerLine)
+            srtLines.push(`${srtIdx++}`)
+            srtLines.push(`${toSRTTime(timeOffset)} --> ${toSRTTime(timeOffset + dur)}`)
+            srtLines.push(display)
+            srtLines.push('')
+            timeOffset += dur
           }
         }
         srtContent = srtLines.join('\n')
@@ -935,11 +1112,12 @@ async function voiceoverRoutes(fastify) {
         fs.writeFileSync(srtPath, srtContent, 'utf8')
       }
 
-      const fontPath = '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc'
-      const fontExists = fs.existsSync(fontPath)
       const subtitleFilter = srtContent
-        ? `subtitles='${srtPath.replace(/'/g, "'\\''")}':force_style='FontName=${fontExists ? 'Noto Sans CJK SC' : 'Sans'},FontSize=16,PrimaryColour=&HFFFFFF,OutlineColour=&H80000000,BackColour=&H80000000,BorderStyle=3,Outline=1,Shadow=0,Alignment=2,MarginV=50'`
+        ? `subtitles='${srtPath.replace(/'/g, "'\\''")}':force_style='${buildForceStyle(subtitleStyle)}'`
         : null
+      const bannerFilter = buildBannerFilter(banner, videoWidth || 720, videoHeight || 1280, bannerStyle, tmpDir)
+      const vfParts = [subtitleFilter, bannerFilter].filter(Boolean)
+      const vfFilter = vfParts.length ? vfParts.join(',') : null
 
       if (gap > 0.3) {
         const freezePath = path.join(tmpDir, 'video_freeze.mp4')
@@ -950,10 +1128,10 @@ async function voiceoverRoutes(fastify) {
           freezePath,
         ], { timeout: 300_000 })
 
-        if (subtitleFilter) {
+        if (vfFilter) {
           const withSubs = path.join(tmpDir, 'video_subs.mp4')
           await execFileAsync('ffmpeg', [
-            '-y', '-i', freezePath, '-vf', subtitleFilter,
+            '-y', '-i', freezePath, '-vf', vfFilter,
             '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23', '-an',
             withSubs,
           ], { timeout: 300_000 })
@@ -972,10 +1150,10 @@ async function voiceoverRoutes(fastify) {
           ], { timeout: 300_000 })
         }
       } else {
-        if (subtitleFilter) {
+        if (vfFilter) {
           const withSubs = path.join(tmpDir, 'video_subs.mp4')
           await execFileAsync('ffmpeg', [
-            '-y', '-i', videoOnly, '-vf', subtitleFilter,
+            '-y', '-i', videoOnly, '-vf', vfFilter,
             '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23', '-an',
             withSubs,
           ], { timeout: 300_000 })
@@ -1031,11 +1209,31 @@ async function voiceoverRoutes(fastify) {
           audioUrl: { type: 'string' },
           voice:    { type: 'string' },
           ratio:    { type: 'string' },
+          subtitleStyle: {
+            type: 'object',
+            properties: {
+              font:     { type: 'string' },
+              fontSize: { type: 'number' },
+              color:    { type: 'string' },
+              position: { type: 'string' },
+            },
+          },
+          banner: { type: 'string', maxLength: 500 },
+          bannerStyle: {
+            type: 'object',
+            properties: {
+              fontSize: { type: 'number' }, color: { type: 'string' }, alpha: { type: 'number' },
+              borderW: { type: 'number' }, borderColor: { type: 'string' }, borderAlpha: { type: 'number' },
+              shadowX: { type: 'number' }, shadowY: { type: 'number' }, shadowColor: { type: 'string' },
+              boxEnabled: { type: 'boolean' }, boxColor: { type: 'string' }, boxAlpha: { type: 'number' },
+            },
+          },
+          wordBoundaries: { type: 'array', items: { type: 'object', properties: { text: { type: 'string' }, offset: { type: 'number' }, duration: { type: 'number' } } } },
         },
       },
     },
   }, async (request, reply) => {
-    const { shots, audioUrl, voice, ratio = '9:16' } = request.body
+    const { shots, audioUrl, voice, ratio = '9:16', subtitleStyle, banner, bannerStyle = {}, wordBoundaries } = request.body
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'voiceover-imgmerge-'))
 
     const RATIO_MAP = { '9:16': [1080,1920], '16:9': [1920,1080], '1:1': [1080,1080], '4:3': [1440,1080], '3:4': [1080,1440], '21:9': [2520,1080] }
@@ -1064,27 +1262,41 @@ async function voiceoverRoutes(fastify) {
         return Math.max(0.5, Math.round(raw * 100) / 100)
       })
 
+      const imgAssFontSize = Math.round(((subtitleStyle && subtitleStyle.fontSize) || 4.2) * 3.84)
+      const imgMaxPerLine = calcMaxCharsPerLine(W, H, imgAssFontSize)
+
+      // AI 断句整段字幕
+      const imgFullText = shots.map(s => (s.subtitle || '').trim()).join('')
+      let imgSegments = imgFullText ? jiebaSegmentSubtitle(imgFullText, imgMaxPerLine) : null
+
       const srtLines = []
       let srtIdx = 1, srtOffset = 0
-      shots.forEach((shot, i) => {
-        const dur  = shotDurs[i]
-        const text = (shot.subtitle || '').trim()
-        if (text) {
-          const chunks     = chunkSubtitle(text)
-          const totalC = chunks.reduce((s, c) => s + c.length, 0)
-          let chunkOffset  = srtOffset
-          chunks.forEach(chunk => {
-            const chunkDur = totalC > 0 ? dur * (chunk.length / totalC) : dur / chunks.length
-            const display = chunk.replace(/[。！？…；，、,;.!?：:]+$/, '')
+
+      if (imgSegments && imgSegments.length > 0) {
+        const aligned = alignSegmentsWithWordBoundaries(imgSegments, wordBoundaries)
+        if (aligned && aligned.some(a => a.end > 0)) {
+          for (const { text, start, end } of aligned) {
+            if (end <= start) continue
+            const display = wrapSubtitleLine(text, imgMaxPerLine)
             srtLines.push(`${srtIdx++}`)
-            srtLines.push(`${toSRTTime(chunkOffset)} --> ${toSRTTime(chunkOffset + chunkDur)}`)
+            srtLines.push(`${toSRTTime(start)} --> ${toSRTTime(end)}`)
             srtLines.push(display)
             srtLines.push('')
-            chunkOffset += chunkDur
-          })
+          }
+        } else {
+          const segTotalChars = imgSegments.reduce((a, s) => a + s.length, 0) || 1
+          let timeOff = 0
+          for (const seg of imgSegments) {
+            const dur = audioDur * (seg.length / segTotalChars)
+            const display = wrapSubtitleLine(seg, imgMaxPerLine)
+            srtLines.push(`${srtIdx++}`)
+            srtLines.push(`${toSRTTime(timeOff)} --> ${toSRTTime(timeOff + dur)}`)
+            srtLines.push(display)
+            srtLines.push('')
+            timeOff += dur
+          }
         }
-        srtOffset += dur
-      })
+      }
       const preciseSRT = srtLines.join('\n')
 
       const videoPaths = await Promise.all(
@@ -1131,17 +1343,21 @@ async function voiceoverRoutes(fastify) {
         videoOnly,
       ], { timeout: 600_000 })
 
-      if (hasSubtitles) {
-        const srtPath = path.join(tmpDir, 'subtitles.srt')
-        fs.writeFileSync(srtPath, preciseSRT, 'utf8')
+      const imgBannerFilter = buildBannerFilter(banner, W, H, bannerStyle, tmpDir)
 
-        const fontPath = '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc'
-        const fontExists = fs.existsSync(fontPath)
-        const subtitleFilter = `subtitles='${srtPath.replace(/'/g, "'\\''")}':force_style='FontName=${fontExists ? 'Noto Sans CJK SC' : 'Sans'},FontSize=16,PrimaryColour=&HFFFFFF,OutlineColour=&H80000000,BackColour=&H80000000,BorderStyle=3,Outline=1,Shadow=0,Alignment=2,MarginV=50'`
+      if (hasSubtitles || imgBannerFilter) {
+        let vfParts = []
+        if (hasSubtitles) {
+          const srtPath = path.join(tmpDir, 'subtitles.srt')
+          fs.writeFileSync(srtPath, preciseSRT, 'utf8')
+          vfParts.push(`subtitles='${srtPath.replace(/'/g, "'\\''")}':force_style='${buildForceStyle(subtitleStyle)}'`)
+        }
+        if (imgBannerFilter) vfParts.push(imgBannerFilter)
+        const vfFilter = vfParts.join(',')
 
         const withSubs = path.join(tmpDir, 'video_subs.mp4')
         await execFileAsync('ffmpeg', [
-          '-y', '-i', videoOnly, '-vf', subtitleFilter,
+          '-y', '-i', videoOnly, '-vf', vfFilter,
           '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23', '-an',
           withSubs,
         ], { timeout: 300_000 })
@@ -1168,6 +1384,76 @@ async function voiceoverRoutes(fastify) {
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true })
     }
+  })
+
+  // ── 异步合并任务 ─────────────────────────────────────────────────────────
+  const mergeTasks = new Map()
+
+  fastify.post('/merge-async', {
+    schema: {
+      body: {
+        type: 'object', required: ['videos', 'audioUrl'],
+        properties: {
+          videos: {
+            type: 'array', minItems: 1, maxItems: 20,
+            items: {
+              type: 'object', required: ['url'],
+              properties: {
+                url:      { type: 'string' },
+                subtitle: { type: 'string' },
+                duration: { type: 'number' },
+              },
+            },
+          },
+          audioUrl: { type: 'string' },
+          voice:    { type: 'string' },
+          subtitle: { type: 'string' },
+          subtitleStyle: { type: 'object' },
+          banner: { type: 'string', maxLength: 500 },
+          bannerStyle: { type: 'object' },
+          wordBoundaries: { type: 'array' },
+        },
+      },
+    },
+  }, async (request, reply) => {
+    const mergeId = crypto.randomUUID()
+    mergeTasks.set(mergeId, { status: 'processing', startedAt: Date.now() })
+
+    const body = request.body
+    ;(async () => {
+      try {
+        const res = await fastify.inject({
+          method: 'POST',
+          url: '/merge',
+          payload: body,
+        })
+        const data = JSON.parse(res.payload)
+        if (data.success) {
+          mergeTasks.set(mergeId, { status: 'done', url: data.data.url, data: data.data, startedAt: mergeTasks.get(mergeId)?.startedAt })
+        } else {
+          mergeTasks.set(mergeId, { status: 'failed', error: data.error || '合并失败', startedAt: mergeTasks.get(mergeId)?.startedAt })
+        }
+      } catch (err) {
+        mergeTasks.set(mergeId, { status: 'failed', error: err.message || '合并失败', startedAt: mergeTasks.get(mergeId)?.startedAt })
+      }
+    })()
+
+    return { success: true, mergeId }
+  })
+
+  fastify.get('/merge-status/:mergeId', async (request, reply) => {
+    const { mergeId } = request.params
+    const task = mergeTasks.get(mergeId)
+    if (!task) return { success: true, data: { status: 'failed', error: '任务不存在或已过期' } }
+    if (task.status === 'done') {
+      mergeTasks.delete(mergeId)
+      return { success: true, data: { status: 'done', url: task.url } }
+    }
+    if (task.status === 'failed') {
+      mergeTasks.delete(mergeId)
+      return { success: true, data: { status: 'failed', error: task.error } }
+    }
+    return { success: true, data: { status: 'processing' } }
   })
 }
 

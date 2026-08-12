@@ -51,6 +51,10 @@ async function initDB() {
   `).catch(() => {})
 
   await query(`
+    ALTER TABLE batch_tasks ADD COLUMN IF NOT EXISTS audio_url TEXT
+  `).catch(() => {})
+
+  await query(`
     CREATE TABLE IF NOT EXISTS user_asset_groups (
       id SERIAL PRIMARY KEY,
       user_id INT REFERENCES users(id),

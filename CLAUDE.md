@@ -86,6 +86,32 @@ cd frontend && npm run dev  # port 8111
 cd backend && node src/app.js  # port 8112
 ```
 
+## Deployment (video.xingke888.com)
+
+PM2 manages the production processes. Frontend on port 8115, backend on port 8116.
+
+### Switch to dev mode (hot reload)
+
+```bash
+pm2 stop seedance2-frontend
+cd /home/ubuntu/seedance/frontend && npx next dev -p 8115 &
+```
+
+### Switch back to production mode
+
+```bash
+# Kill the dev process
+kill $(lsof -t -i:8115)
+# Rebuild and restart via PM2
+cd /home/ubuntu/seedance/frontend && npm run build
+pm2 start seedance2-frontend
+```
+
+### PM2 process names
+
+- `seedance2-frontend` — Next.js frontend (port 8115)
+- `seedance2-backend` — Fastify backend (port 8116)
+
 ## Git
 
 - Avatar images (`frontend/public/avatars/`) are in .gitignore (too large for git)

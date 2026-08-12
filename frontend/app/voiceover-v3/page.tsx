@@ -54,6 +54,7 @@ interface BatchTask {
   subtitle_input: string;
   tasks: Record<number, ShotTask>;
   merged_video_url: string | null;
+  audio_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -74,6 +75,10 @@ interface PersistedWork {
   audioUrl?:     string | null;
   voice?:        string;
   batchId?:      string | null;
+  subtitleStyle?: SubtitleStyle;
+  banner?:       string;
+  bannerStyle?:  BannerStyle;
+  mergeId?:      string | null;
 }
 
 function loadWork(): PersistedWork | null {
@@ -198,6 +203,74 @@ const AZURE_VOICES = [
   { value: 'zh-HK-WanLungNeural',   label: '云龙（粤语男声）' },
   { value: 'zh-HK-HiuGaaiNeural',   label: '晓佳（粤语女声·活泼）' },
 ];
+
+const SUBTITLE_FONTS = [
+  { value: 'Noto Sans CJK SC',       label: '思源黑体' },
+  { value: 'Noto Serif CJK SC',      label: '思源宋体' },
+  { value: 'Noto Sans CJK SC Medium', label: '思源黑体 中粗' },
+  { value: 'Noto Serif CJK SC SemiBold', label: '思源宋体 半粗' },
+  { value: 'WenQuanYi Zen Hei',      label: '文泉驿正黑' },
+  { value: 'DejaVu Sans',            label: 'DejaVu Sans' },
+  { value: 'Liberation Sans',        label: 'Liberation Sans' },
+];
+
+const SUBTITLE_POSITIONS = [
+  { value: 'bottom', label: '底部' },
+  { value: 'top',    label: '顶部' },
+  { value: 'center', label: '居中' },
+];
+
+interface SubtitleStyle {
+  font: string;
+  fontSize: number;
+  color: string;
+  alpha: number;
+  position: string;
+  borderW: number;
+  borderColor: string;
+  borderAlpha: number;
+}
+
+const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
+  font: 'Noto Sans CJK SC',
+  fontSize: 4.2,
+  color: '#FFFFFF',
+  alpha: 1.0,
+  position: 'bottom',
+  borderW: 1,
+  borderColor: '#000000',
+  borderAlpha: 0.5,
+};
+
+interface BannerStyle {
+  fontSize:    number;
+  color:       string;
+  alpha:       number;
+  borderW:     number;
+  borderColor: string;
+  borderAlpha: number;
+  shadowX:     number;
+  shadowY:     number;
+  shadowColor: string;
+  boxEnabled:  boolean;
+  boxColor:    string;
+  boxAlpha:    number;
+}
+
+const DEFAULT_BANNER_STYLE: BannerStyle = {
+  fontSize:    2.8,
+  color:       '#ffffff',
+  alpha:       1.0,
+  borderW:     2,
+  borderColor: '#000000',
+  borderAlpha: 0.6,
+  shadowX:     0,
+  shadowY:     0,
+  shadowColor: '#000000',
+  boxEnabled:  false,
+  boxColor:    '#000000',
+  boxAlpha:    0.5,
+};
 
 const TERMINAL = new Set(['succeeded', 'failed', 'expired', 'cancelled']);
 const STATUS_LABELS: Record<string, string> = {
@@ -575,6 +648,9 @@ function ParamsPanel(p: {
   showJsonPreview: boolean; onToggleJsonPreview: () => void;
   subtitleMode: 'on' | 'off'; onSubtitleModeChange: (v: 'on' | 'off') => void;
   voice: string; onVoiceChange: (v: string) => void;
+  banner: string; onBannerChange: (v: string) => void;
+  bannerStyle: BannerStyle; onBannerStyleChange: (v: BannerStyle) => void;
+  subtitleStyle: SubtitleStyle; onSubtitleStyleChange: (v: SubtitleStyle) => void;
   duration: number;
   mediaItems: MediaItem[];
 }) {
@@ -613,84 +689,51 @@ function ParamsPanel(p: {
     <div>
       <p className={styles.cardTitle} style={{ marginBottom: 8 }}>视频参数</p>
       <div>
-          {/* 模型 + 分辨率 一行 */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+          {/* 模型 + 分辨率 + 视觉风格 一行 */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
             <div style={{ flex: 2 }}>
               <span className={styles.paramLabel}>模型</span>
               <select value={p.model} onChange={e => p.onModelChange(e.target.value)}
-                className={styles.select} style={{ width: '100%', marginTop: 3 }}>
+                className={styles.select} style={{ width: '100%', marginTop: 2 }}>
                 {MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
               </select>
             </div>
             <div style={{ flex: 1 }}>
               <span className={styles.paramLabel}>分辨率</span>
               <select value={p.resolution} onChange={e => p.onResolutionChange(e.target.value)}
-                className={styles.select} style={{ width: '100%', marginTop: 3 }}>
+                className={styles.select} style={{ width: '100%', marginTop: 2 }}>
                 {RESOLUTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
               </select>
             </div>
-          </div>
-
-          {/* 视觉风格 */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
             <div style={{ flex: 1 }}>
-              <span className={styles.paramLabel}>视觉风格</span>
+              <span className={styles.paramLabel}>风格</span>
               <select value={p.style} onChange={e => p.onStyleChange(e.target.value)}
-                className={styles.select} style={{ width: '100%', marginTop: 3 }}>
+                className={styles.select} style={{ width: '100%', marginTop: 2 }}>
                 {STYLES.map(s => <option key={s.label} value={s.value}>{s.label}</option>)}
               </select>
             </div>
           </div>
 
-          {/* 画面比例 一行 chips */}
-          <div style={{ marginBottom: 8 }}>
-            <span className={styles.paramLabel}>画面比例</span>
-            <div className={styles.chipGroup} style={{ marginBottom: 0, marginTop: 3 }}>
-              {RATIOS.map(r => (
-                <button key={r.value} type="button" onClick={() => p.onRatioChange(r.value)}
-                  className={`${styles.chip} ${p.ratio === r.value ? styles.chipActive : ''}`}>{r.label}</button>
-              ))}
-            </div>
-          </div>
-
-          {/* 字幕模式 chips */}
-          <div style={{ marginBottom: 8 }}>
-            <span className={styles.paramLabel}>字幕模式</span>
-            <div className={styles.chipGroup} style={{ marginBottom: 0, marginTop: 3 }}>
-              {([['on', '有字幕'], ['off', '无字幕']] as const).map(([val, label]) => (
-                <button key={val} type="button" onClick={() => p.onSubtitleModeChange(val)}
-                  className={`${styles.chip} ${p.subtitleMode === val ? styles.chipActive : ''}`}>{label}</button>
-              ))}
-            </div>
-          </div>
-
-          {/* 配音音色 */}
-          <div style={{ marginBottom: 8 }}>
-            <span className={styles.paramLabel}>配音音色</span>
-            <select value={p.voice} onChange={e => p.onVoiceChange(e.target.value)}
-              className={styles.select} style={{ width: '100%', marginTop: 3 }}>
-              {AZURE_VOICES.map(v => <option key={v.value} value={v.value}>{v.label}</option>)}
-            </select>
-          </div>
-
-          <div className={styles.divider} />
-
-          {/* 随机种子 + 服务等级 一行 */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+          {/* 比例 + 配音音色 + 服务等级 一行 */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
             <div style={{ flex: 1 }}>
-              <span className={styles.paramLabel}>随机种子</span>
-              <div style={{ display: 'flex', gap: 4, marginTop: 3 }}>
-                <input type="number" placeholder="留空随机" min={0} max={2147483647}
-                  value={p.seed ?? ''}
-                  onChange={e => p.onSeedChange(e.target.value ? parseInt(e.target.value) : null)}
-                  className={styles.input} style={{ padding: '5px 8px', fontSize: 12 }} />
-                {p.seed !== null && <button onClick={() => p.onSeedChange(null)} style={{ fontSize: 11, color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>清除</button>}
-              </div>
+              <span className={styles.paramLabel}>比例</span>
+              <select value={p.ratio} onChange={e => p.onRatioChange(e.target.value)}
+                className={styles.select} style={{ width: '100%', marginTop: 2 }}>
+                {RATIOS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+              </select>
+            </div>
+            <div style={{ flex: 2 }}>
+              <span className={styles.paramLabel}>配音音色</span>
+              <select value={p.voice} onChange={e => p.onVoiceChange(e.target.value)}
+                className={styles.select} style={{ width: '100%', marginTop: 2 }}>
+                {AZURE_VOICES.map(v => <option key={v.value} value={v.value}>{v.label}</option>)}
+              </select>
             </div>
             <div style={{ flex: 1 }}>
               <span className={styles.paramLabel}>服务等级</span>
               <select value={p.serviceTier} onChange={e => p.onServiceTierChange(e.target.value)}
-                className={styles.select} style={{ width: '100%', marginTop: 3 }}>
+                className={styles.select} style={{ width: '100%', marginTop: 2 }}>
                 <option value="default">default</option>
                 <option value="standard">standard</option>
                 <option value="priority">priority</option>
@@ -698,35 +741,203 @@ function ParamsPanel(p: {
             </div>
           </div>
 
-          {/* 优先级 一行 */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <span style={{ fontSize: 11, color: '#6b7280', whiteSpace: 'nowrap' }}>优先级</span>
-            <input type="range" min={0} max={9} value={p.priority}
-              onChange={e => p.onPriorityChange(parseInt(e.target.value))}
-              style={{ flex: 1 }} />
-            <span style={{ fontSize: 12, color: '#6b7280', minWidth: 16 }}>{p.priority}</span>
-          </div>
-
-          <div className={styles.divider} />
-
-          {/* Toggles 网格排列 */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px' }}>
-            <Toggle enabled={p.generateAudio} onToggle={p.onToggleAudio} label="生成音频" />
+          {/* Toggles 紧凑一行 */}
+          <div style={{ display: 'flex', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
+            <Toggle enabled={p.generateAudio} onToggle={p.onToggleAudio} label="音频" />
             <Toggle enabled={p.watermark} onToggle={p.onToggleWatermark} label="水印" />
-            <Toggle enabled={p.returnLastFrame} onToggle={p.onToggleReturnLastFrame} label="返回尾帧" />
-            {is15pro && <Toggle enabled={p.draft} onToggle={p.onToggleDraft} label="样片模式" />}
-            {is2x && <Toggle enabled={p.webSearch} onToggle={p.onToggleWebSearch} label="联网搜索" />}
+            <Toggle enabled={p.returnLastFrame} onToggle={p.onToggleReturnLastFrame} label="尾帧" />
+            {is15pro && <Toggle enabled={p.draft} onToggle={p.onToggleDraft} label="样片" />}
+            {is2x && <Toggle enabled={p.webSearch} onToggle={p.onToggleWebSearch} label="联网" />}
           </div>
 
-          <div className={styles.divider} />
+          {/* 随机种子 + 优先级 一行 */}
+          <div style={{ display: 'none', gap: 6, marginBottom: 6, alignItems: 'center' }}>
+            <div style={{ flex: 1 }}>
+              <span className={styles.paramLabel}>种子</span>
+              <div style={{ display: 'flex', gap: 4, marginTop: 2 }}>
+                <input type="number" placeholder="随机" min={0} max={2147483647}
+                  value={p.seed ?? ''}
+                  onChange={e => p.onSeedChange(e.target.value ? parseInt(e.target.value) : null)}
+                  className={styles.input} style={{ padding: '4px 6px', fontSize: 12 }} />
+                {p.seed !== null && <button onClick={() => p.onSeedChange(null)} style={{ fontSize: 10, color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>清</button>}
+              </div>
+            </div>
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ fontSize: 11, color: '#6b7280', whiteSpace: 'nowrap' }}>优先级</span>
+              <input type="range" min={0} max={9} value={p.priority}
+                onChange={e => p.onPriorityChange(parseInt(e.target.value))}
+                style={{ flex: 1 }} />
+              <span style={{ fontSize: 11, color: '#6b7280', minWidth: 12 }}>{p.priority}</span>
+            </div>
+          </div>
+
+          <div style={{ height: 1, background: '#e5e7eb', margin: '8px 0' }} />
+
+          {/* 视频标语（全程显示） */}
+          <div style={{ marginBottom: 4 }}>
+            <span className={styles.paramLabel}>视频标语（全程显示）</span>
+            <textarea rows={2} value={p.banner} onChange={e => p.onBannerChange(e.target.value)}
+              placeholder="输入标语，支持多行，全程显示在顶部…"
+              className={styles.input} style={{ width: '100%', marginTop: 2, padding: '3px 5px', fontSize: 11, resize: 'vertical', lineHeight: 1.4 }} />
+            {/* 标语样式控件 */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '2px 4px', marginTop: 3 }}>
+              <div>
+                <span className={styles.paramLabel}>字号%</span>
+                <input type="number" min={1} max={8} step={0.5}
+                  value={p.bannerStyle.fontSize}
+                  onChange={e => p.onBannerStyleChange({ ...p.bannerStyle, fontSize: parseFloat(e.target.value) || 2.8 })}
+                  className={styles.input} style={{ width: '100%', padding: '1px 3px', fontSize: 11, marginTop: 1 }} />
+              </div>
+              <div>
+                <span className={styles.paramLabel}>字色</span>
+                <input type="color" value={p.bannerStyle.color}
+                  onChange={e => p.onBannerStyleChange({ ...p.bannerStyle, color: e.target.value })}
+                  style={{ width: '100%', height: 20, marginTop: 1, cursor: 'pointer', border: '1px solid #e5e7eb', borderRadius: 3, padding: 1 }} />
+              </div>
+              <div>
+                <span className={styles.paramLabel}>透明度</span>
+                <input type="number" min={0} max={1} step={0.1}
+                  value={p.bannerStyle.alpha}
+                  onChange={e => p.onBannerStyleChange({ ...p.bannerStyle, alpha: parseFloat(e.target.value) ?? 1 })}
+                  className={styles.input} style={{ width: '100%', padding: '1px 3px', fontSize: 11, marginTop: 1 }} />
+              </div>
+              <div>
+                <span className={styles.paramLabel}>描边宽</span>
+                <input type="number" min={0} max={8} step={1}
+                  value={p.bannerStyle.borderW}
+                  onChange={e => p.onBannerStyleChange({ ...p.bannerStyle, borderW: parseInt(e.target.value) || 0 })}
+                  className={styles.input} style={{ width: '100%', padding: '1px 3px', fontSize: 11, marginTop: 1 }} />
+              </div>
+              <div>
+                <span className={styles.paramLabel}>描边色</span>
+                <input type="color" value={p.bannerStyle.borderColor}
+                  onChange={e => p.onBannerStyleChange({ ...p.bannerStyle, borderColor: e.target.value })}
+                  style={{ width: '100%', height: 20, marginTop: 1, cursor: 'pointer', border: '1px solid #e5e7eb', borderRadius: 3, padding: 1 }} />
+              </div>
+              <div>
+                <span className={styles.paramLabel}>描边透</span>
+                <input type="number" min={0} max={1} step={0.1}
+                  value={p.bannerStyle.borderAlpha}
+                  onChange={e => p.onBannerStyleChange({ ...p.bannerStyle, borderAlpha: parseFloat(e.target.value) ?? 0.6 })}
+                  className={styles.input} style={{ width: '100%', padding: '1px 3px', fontSize: 11, marginTop: 1 }} />
+              </div>
+              <div>
+                <span className={styles.paramLabel}>阴影X</span>
+                <input type="number" min={0} max={20} step={1}
+                  value={p.bannerStyle.shadowX}
+                  onChange={e => p.onBannerStyleChange({ ...p.bannerStyle, shadowX: parseInt(e.target.value) || 0 })}
+                  className={styles.input} style={{ width: '100%', padding: '1px 3px', fontSize: 11, marginTop: 1 }} />
+              </div>
+              <div>
+                <span className={styles.paramLabel}>阴影Y</span>
+                <input type="number" min={0} max={20} step={1}
+                  value={p.bannerStyle.shadowY}
+                  onChange={e => p.onBannerStyleChange({ ...p.bannerStyle, shadowY: parseInt(e.target.value) || 0 })}
+                  className={styles.input} style={{ width: '100%', padding: '1px 3px', fontSize: 11, marginTop: 1 }} />
+              </div>
+              <div>
+                <span className={styles.paramLabel}>阴影色</span>
+                <input type="color" value={p.bannerStyle.shadowColor}
+                  onChange={e => p.onBannerStyleChange({ ...p.bannerStyle, shadowColor: e.target.value })}
+                  style={{ width: '100%', height: 20, marginTop: 1, cursor: 'pointer', border: '1px solid #e5e7eb', borderRadius: 3, padding: 1 }} />
+              </div>
+              <div>
+                <span className={styles.paramLabel}>背景块</span>
+                <select value={p.bannerStyle.boxEnabled ? '1' : '0'}
+                  onChange={e => p.onBannerStyleChange({ ...p.bannerStyle, boxEnabled: e.target.value === '1' })}
+                  className={styles.select} style={{ width: '100%', marginTop: 1 }}>
+                  <option value="0">关</option>
+                  <option value="1">开</option>
+                </select>
+              </div>
+              <div>
+                <span className={styles.paramLabel}>背景色</span>
+                <input type="color" value={p.bannerStyle.boxColor}
+                  onChange={e => p.onBannerStyleChange({ ...p.bannerStyle, boxColor: e.target.value })}
+                  style={{ width: '100%', height: 20, marginTop: 1, cursor: 'pointer', border: '1px solid #e5e7eb', borderRadius: 3, padding: 1 }} />
+              </div>
+              <div>
+                <span className={styles.paramLabel}>背景透</span>
+                <input type="number" min={0} max={1} step={0.1}
+                  value={p.bannerStyle.boxAlpha}
+                  onChange={e => p.onBannerStyleChange({ ...p.bannerStyle, boxAlpha: parseFloat(e.target.value) ?? 0.5 })}
+                  className={styles.input} style={{ width: '100%', padding: '1px 3px', fontSize: 11, marginTop: 1 }} />
+              </div>
+            </div>
+          </div>
+
+          <div style={{ height: 1, background: '#e5e7eb', margin: '6px 0' }} />
+
+          {/* 字幕样式 */}
+          <div style={{ marginBottom: 4 }}>
+            <span className={styles.paramLabel}>字幕样式</span>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '2px 4px', marginTop: 3 }}>
+              <div style={{ gridColumn: 'span 2' }}>
+                <span className={styles.paramLabel}>字体</span>
+                <select value={p.subtitleStyle.font} onChange={e => p.onSubtitleStyleChange({ ...p.subtitleStyle, font: e.target.value })}
+                  className={styles.select} style={{ width: '100%', marginTop: 1 }}>
+                  {SUBTITLE_FONTS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <span className={styles.paramLabel}>字号%</span>
+                <input type="number" min={1} max={10} step={0.5}
+                  value={p.subtitleStyle.fontSize}
+                  onChange={e => p.onSubtitleStyleChange({ ...p.subtitleStyle, fontSize: parseFloat(e.target.value) || 4.2 })}
+                  className={styles.input} style={{ width: '100%', padding: '1px 3px', fontSize: 11, marginTop: 1 }} />
+              </div>
+              <div>
+                <span className={styles.paramLabel}>位置</span>
+                <select value={p.subtitleStyle.position} onChange={e => p.onSubtitleStyleChange({ ...p.subtitleStyle, position: e.target.value })}
+                  className={styles.select} style={{ width: '100%', marginTop: 1 }}>
+                  {SUBTITLE_POSITIONS.map(pos => <option key={pos.value} value={pos.value}>{pos.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <span className={styles.paramLabel}>字色</span>
+                <input type="color" value={p.subtitleStyle.color}
+                  onChange={e => p.onSubtitleStyleChange({ ...p.subtitleStyle, color: e.target.value })}
+                  style={{ width: '100%', height: 20, marginTop: 1, cursor: 'pointer', border: '1px solid #e5e7eb', borderRadius: 3, padding: 1 }} />
+              </div>
+              <div>
+                <span className={styles.paramLabel}>透明度</span>
+                <input type="number" min={0} max={1} step={0.1}
+                  value={p.subtitleStyle.alpha}
+                  onChange={e => p.onSubtitleStyleChange({ ...p.subtitleStyle, alpha: parseFloat(e.target.value) ?? 1 })}
+                  className={styles.input} style={{ width: '100%', padding: '1px 3px', fontSize: 11, marginTop: 1 }} />
+              </div>
+              <div>
+                <span className={styles.paramLabel}>描边宽</span>
+                <input type="number" min={0} max={8} step={1}
+                  value={p.subtitleStyle.borderW}
+                  onChange={e => p.onSubtitleStyleChange({ ...p.subtitleStyle, borderW: parseInt(e.target.value) || 0 })}
+                  className={styles.input} style={{ width: '100%', padding: '1px 3px', fontSize: 11, marginTop: 1 }} />
+              </div>
+              <div>
+                <span className={styles.paramLabel}>描边色</span>
+                <input type="color" value={p.subtitleStyle.borderColor}
+                  onChange={e => p.onSubtitleStyleChange({ ...p.subtitleStyle, borderColor: e.target.value })}
+                  style={{ width: '100%', height: 20, marginTop: 1, cursor: 'pointer', border: '1px solid #e5e7eb', borderRadius: 3, padding: 1 }} />
+              </div>
+              <div>
+                <span className={styles.paramLabel}>描边透</span>
+                <input type="number" min={0} max={1} step={0.1}
+                  value={p.subtitleStyle.borderAlpha}
+                  onChange={e => p.onSubtitleStyleChange({ ...p.subtitleStyle, borderAlpha: parseFloat(e.target.value) ?? 0.5 })}
+                  className={styles.input} style={{ width: '100%', padding: '1px 3px', fontSize: 11, marginTop: 1 }} />
+              </div>
+            </div>
+          </div>
+
+          <div style={{ height: 1, background: '#e5e7eb', margin: '8px 0' }} />
 
           {/* JSON Preview Toggle */}
           <button onClick={p.onToggleJsonPreview}
-            style={{ width: '100%', padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: 6, background: p.showJsonPreview ? '#eff6ff' : '#fff', fontSize: 12, cursor: 'pointer', color: '#374151', textAlign: 'left' }}>
-            {p.showJsonPreview ? '▼' : '▶'} 预览提交 JSON
+            style={{ width: '100%', padding: '5px 10px', border: '1px solid #e5e7eb', borderRadius: 6, background: p.showJsonPreview ? '#eff6ff' : '#fff', fontSize: 11, cursor: 'pointer', color: '#374151', textAlign: 'left' }}>
+            {p.showJsonPreview ? '▼' : '▶'} 预览 JSON
           </button>
           {p.showJsonPreview && (
-            <pre style={{ margin: '8px 0 0', padding: 10, background: '#1e293b', color: '#e2e8f0', borderRadius: 6, fontSize: 11, lineHeight: 1.5, overflow: 'auto', maxHeight: 300 }}>
+            <pre style={{ margin: '6px 0 0', padding: 8, background: '#1e293b', color: '#e2e8f0', borderRadius: 6, fontSize: 11, lineHeight: 1.4, overflow: 'auto', maxHeight: 300 }}>
               {JSON.stringify(previewBody, null, 2)}
             </pre>
           )}
@@ -763,10 +974,14 @@ export default function VoiceoverPage() {
   const [draft, setDraft]                 = useState(false);
   const [webSearch, setWebSearch]         = useState(false);
   const [subtitleMode, setSubtitleMode]   = useState<'on' | 'off'>('off');
+  const [subtitleStyle, setSubtitleStyle] = useState<SubtitleStyle>(DEFAULT_SUBTITLE_STYLE);
+  const [banner, setBanner]               = useState('');
+  const [bannerStyle, setBannerStyle]     = useState<BannerStyle>(DEFAULT_BANNER_STYLE);
   const [showJsonPreview, setShowJsonPreview] = useState(false);
   const [voice, setVoice]                 = useState('zh-CN-XiaoqiuNeural');
   const [audioUrl, setAudioUrl]           = useState<string | null>(null);
   const [audioDuration, setAudioDuration] = useState<number>(0);
+  const [wordBoundaries, setWordBoundaries] = useState<Array<{text: string; offset: number; duration: number}>>([]);
   const [ttsLoading, setTtsLoading]       = useState(false);
   const [tasks, setTasks]                 = useState<Record<number, ShotTask>>({});
   const pollRefs = useRef<Record<number, ReturnType<typeof setInterval>>>({});
@@ -776,6 +991,8 @@ export default function VoiceoverPage() {
   const [merging, setMerging]               = useState(false);
   const [mergedVideoUrl, setMergedVideoUrl] = useState<string | null>(null);
   const [mergeError, setMergeError]         = useState('');
+  const [mergeId, setMergeId]               = useState<string | null>(null);
+  const mergePollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
 
   const [showMobileParams, setShowMobileParams] = useState(false);
@@ -819,6 +1036,10 @@ export default function VoiceoverPage() {
       if (saved.audioUrl)       setAudioUrl(saved.audioUrl);
       if (saved.voice)          setVoice(saved.voice);
       if (saved.batchId)        setBatchId(saved.batchId);
+      if (saved.subtitleStyle)  setSubtitleStyle(saved.subtitleStyle);
+      if (saved.banner)         setBanner(saved.banner);
+      if (saved.bannerStyle)    setBannerStyle(saved.bannerStyle);
+      if (saved.mergeId)        setMergeId(saved.mergeId);
       if (saved.tasks && Object.keys(saved.tasks).length) {
         const restoredTasks: Record<number, ShotTask> = {};
         for (const [k, t] of Object.entries(saved.tasks)) {
@@ -847,10 +1068,21 @@ export default function VoiceoverPage() {
 
   useEffect(() => {
     if (!workLoaded) return;
-    if (initing) return;
-    saveWork({ script, style, ratio, initResult, shots, tasks, mergedVideoUrl, subtitleInput, audioUrl, voice, batchId });
+    if (mergeId && !mergedVideoUrl && !mergePollingRef.current) {
+      pollMergeStatus(mergeId);
+    }
+    return () => {
+      if (mergePollingRef.current) { clearInterval(mergePollingRef.current); mergePollingRef.current = null; }
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workLoaded, script, style, ratio, initResult, shots, tasks, mergedVideoUrl, subtitleInput, audioUrl, voice, batchId]);
+  }, [workLoaded]);
+
+  useEffect(() => {
+    if (!workLoaded) return;
+    if (initing) return;
+    saveWork({ script, style, ratio, initResult, shots, tasks, mergedVideoUrl, subtitleInput, audioUrl, voice, batchId, subtitleStyle, banner, bannerStyle, mergeId });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workLoaded, script, style, ratio, initResult, shots, tasks, mergedVideoUrl, subtitleInput, audioUrl, voice, batchId, subtitleStyle, banner, bannerStyle, mergeId]);
 
   useEffect(() => {
     function onVisible() {
@@ -1003,12 +1235,29 @@ export default function VoiceoverPage() {
     batchSeedRef.current = null;
     Object.values(pollRefs.current).forEach(clearInterval);
     pollRefs.current = {};
+
+    // 若有图片素材且尚未定义主体，先自动分析主体
+    let resolvedSubjectDefs = subjectDefs.trim();
+    const images = mediaItems.filter(m => m.mediaType === 'image' && !m.uploading && (m.previewUrl || m.url));
+    if (images.length > 0 && !resolvedSubjectDefs) {
+      setAnalyzingSubjects(true); setSubjectError('');
+      try {
+        const media = images.map(m => ({ url: m.url, mediaType: m.mediaType, previewUrl: m.previewUrl || m.url }));
+        const result = await api.post<{ definitions: string[]; summary: string; usageHint: string }>('/voiceover/analyze-subjects', { media });
+        resolvedSubjectDefs = result.definitions.join('\n');
+        setSubjectDefs(resolvedSubjectDefs);
+        prevSubjectDefsRef.current = resolvedSubjectDefs;
+      } catch (err) {
+        setSubjectError(err instanceof Error ? err.message : '主体分析失败');
+      } finally { setAnalyzingSubjects(false); }
+    }
+
     try {
       const readyMedia = mediaItems.filter(m => m.url && !m.uploading);
       const imageCount = readyMedia.filter(m => m.mediaType === 'image').length;
       const videoCount = readyMedia.filter(m => m.mediaType === 'video').length;
       const audioCount = readyMedia.filter(m => m.mediaType === 'audio').length;
-      const result = await api.post<InitResult>('/voiceover/init', { script: script.trim(), style, ratio, imageCount, videoCount, audioCount, subjectDefinitions: subjectDefs.trim() || undefined, subtitleMode, subtitleInput: subtitleInput.trim() || undefined });
+      const result = await api.post<InitResult>('/voiceover/init', { script: script.trim(), style, ratio, imageCount, videoCount, audioCount, subjectDefinitions: resolvedSubjectDefs || undefined, subtitleMode, subtitleInput: subtitleInput.trim() || undefined });
       setInitResult(result);
       setShots(result.shots);
       if (!subtitleInput.trim() && result.shots.length > 0) {
@@ -1018,14 +1267,17 @@ export default function VoiceoverPage() {
 
       // TTS: 生成语音并按实际时长更新各分镜 duration
       const ttsScript = subtitleInput.trim() || result.shots.map(s => s.subtitle).join('');
+      let ttsAudioUrl: string | null = null;
       if (ttsScript) {
         setTtsLoading(true);
         try {
-          const ttsRes = await api.post<{ audioUrl: string; totalDuration: number; shotDurations: number[]; totalVideoDuration: number }>('/voiceover/tts', {
+          const ttsRes = await api.post<{ audioUrl: string; totalDuration: number; shotDurations: number[]; totalVideoDuration: number; wordBoundaries?: Array<{text: string; offset: number; duration: number}> }>('/voiceover/tts', {
             script: ttsScript, voice, shots: result.shots.map(s => ({ subtitle: s.subtitle })),
           });
           setAudioUrl(ttsRes.audioUrl);
           setAudioDuration(ttsRes.totalDuration);
+          if (ttsRes.wordBoundaries) setWordBoundaries(ttsRes.wordBoundaries);
+          ttsAudioUrl = ttsRes.audioUrl;
           const updatedShots = result.shots.map((s, i) => ({ ...s, duration: ttsRes.shotDurations[i] ?? s.duration }));
           setShots(updatedShots);
           result.shots = updatedShots;
@@ -1036,15 +1288,21 @@ export default function VoiceoverPage() {
       }
 
       const autoName = (script.trim() || subtitleInput.trim()).slice(0, 30) || '未命名任务';
-      const batch = await api.post<BatchTask>('/batch', {
+      const batchPayload = {
         name: autoName, script: script.trim(), style, ratio, seed: batchSeedRef.current,
-        shots: result.shots, media_items: mediaItems.filter(m => m.url && !m.uploading),
+        shots: result.shots, media_items: mediaItems.filter(m => m.url && !m.uploading).map(m => ({ ...m, previewUrl: m.previewUrl?.startsWith('blob:') ? m.url : m.previewUrl })),
         params: { model, resolution, generateAudio, watermark, seed: batchSeedRef.current, serviceTier, priority, returnLastFrame, draft, webSearch, subtitleMode, voice },
         subject_defs: subjectDefs.trim(), subtitle_input: subtitleInput.trim(), tasks: {}, merged_video_url: null,
+        audio_url: ttsAudioUrl,
         init_result: result,
-      });
-      setBatchId(batch.id);
-      setBatchName(autoName);
+      };
+      if (batchId) {
+        await api.put(`/batch/${batchId}`, batchPayload);
+      } else {
+        const batch = await api.post<BatchTask>('/batch', batchPayload);
+        setBatchId(batch.id);
+        setBatchName(autoName);
+      }
     } catch (err) {
       setInitError(err instanceof Error ? err.message : '生成失败，请重试');
     } finally { setIniting(false); }
@@ -1055,14 +1313,14 @@ export default function VoiceoverPage() {
     if (!ttsScript) return;
     setTtsLoading(true);
     try {
-      const ttsRes = await api.post<{ audioUrl: string; totalDuration: number; shotDurations: number[]; totalVideoDuration: number }>('/voiceover/tts', {
+      const ttsRes = await api.post<{ audioUrl: string; totalDuration: number; shotDurations: number[]; totalVideoDuration: number; wordBoundaries?: Array<{text: string; offset: number; duration: number}> }>('/voiceover/tts', {
         script: ttsScript, voice, shots: shots.length > 0 ? shots.map(s => ({ subtitle: s.subtitle })) : [{ subtitle: ttsScript }],
       });
       setAudioUrl(ttsRes.audioUrl);
       setAudioDuration(ttsRes.totalDuration);
-      // 更新数据库
+      if (ttsRes.wordBoundaries) setWordBoundaries(ttsRes.wordBoundaries);
       if (batchId) {
-        try { await api.put(`/batch/${batchId}`, { ...getBatchPayload(), subtitle_input: ttsScript }); } catch {}
+        try { await api.put(`/batch/${batchId}`, { ...getBatchPayload(), subtitle_input: ttsScript, audio_url: ttsRes.audioUrl }); } catch {}
       }
     } catch (e) {
       console.warn('TTS regen failed:', e);
@@ -1073,9 +1331,10 @@ export default function VoiceoverPage() {
     return {
       name: batchName || script.trim().slice(0, 30) || '未命名任务',
       script: script.trim(), style, ratio, seed: batchSeedRef.current,
-      shots, media_items: mediaItems.filter(m => m.url && !m.uploading),
+      shots, media_items: mediaItems.filter(m => m.url && !m.uploading).map(m => ({ ...m, previewUrl: m.previewUrl?.startsWith('blob:') ? m.url : m.previewUrl })),
       params: { model, resolution, generateAudio, watermark, seed: batchSeedRef.current, serviceTier, priority, returnLastFrame, draft, webSearch, subtitleMode, voice },
       subject_defs: subjectDefs.trim(), subtitle_input: subtitleInput.trim(), tasks, merged_video_url: mergedVideoUrl,
+      audio_url: audioUrl,
       init_result: initResult,
     };
   }
@@ -1112,6 +1371,7 @@ export default function VoiceoverPage() {
       setSubtitleInput(full.subtitle_input || (full.shots || []).map(s => s.subtitle).join('') || '');
       setSubjectDefs(full.subject_defs || '');
       setMergedVideoUrl(full.merged_video_url || null);
+      setAudioUrl(full.audio_url || null);
       if (full.params) {
         if (full.params.model) setModel(full.params.model);
         if (full.params.resolution) setResolution(full.params.resolution);
@@ -1197,6 +1457,42 @@ export default function VoiceoverPage() {
         await submitShot(i); await new Promise(r => setTimeout(r, 800));
       }
     }
+    // 保存任务
+    try {
+      const payload = getBatchPayload();
+      if (batchId) {
+        await api.put(`/batch/${batchId}`, payload);
+      } else {
+        const autoName = (script.trim() || subtitleInput.trim()).slice(0, 30) || '未命名任务';
+        const batch = await api.post<BatchTask>('/batch', { ...payload, name: autoName });
+        setBatchId(batch.id); setBatchName(autoName);
+      }
+    } catch {}
+  }
+
+  function pollMergeStatus(mid: string) {
+    if (mergePollingRef.current) clearInterval(mergePollingRef.current);
+    setMerging(true);
+    const check = async () => {
+      try {
+        const res = await api.get<{ status: string; url?: string; error?: string }>(`/voiceover/merge-status/${mid}`);
+        if (res.status === 'done' && res.url) {
+          setMergedVideoUrl(res.url);
+          setMerging(false); setMergeId(null);
+          if (mergePollingRef.current) { clearInterval(mergePollingRef.current); mergePollingRef.current = null; }
+        } else if (res.status === 'failed') {
+          setMergeError(res.error || '合并失败');
+          setMerging(false); setMergeId(null);
+          if (mergePollingRef.current) { clearInterval(mergePollingRef.current); mergePollingRef.current = null; }
+        }
+      } catch (err) {
+        setMergeError(err instanceof Error ? err.message : '合并失败');
+        setMerging(false); setMergeId(null);
+        if (mergePollingRef.current) { clearInterval(mergePollingRef.current); mergePollingRef.current = null; }
+      }
+    };
+    check();
+    mergePollingRef.current = setInterval(check, 3000);
   }
 
   async function handleMerge() {
@@ -1207,12 +1503,14 @@ export default function VoiceoverPage() {
     const fullSubtitle = subtitleInput.trim() || shots.map(s => s.subtitle).join('');
     setMerging(true); setMergeError(''); setMergedVideoUrl(null);
     try {
-      const res = await api.post<{ url: string }>('/voiceover/merge', { videos: videoList, audioUrl, voice, subtitle: fullSubtitle });
-      setMergedVideoUrl(res.url);
+      const res = await api.post<{ mergeId: string }>('/voiceover/merge-async', { videos: videoList, audioUrl, voice, subtitle: fullSubtitle, subtitleStyle, banner, bannerStyle, wordBoundaries });
+      setMergeId(res.mergeId);
+      pollMergeStatus(res.mergeId);
     } catch (err) {
       const msg = err instanceof Error ? err.message : '合并失败';
       setMergeError(msg.length > 120 ? msg.slice(0, 120) + '…' : msg);
-    } finally { setMerging(false); }
+      setMerging(false);
+    }
   }
 
   async function handleImageMerge() {
@@ -1220,7 +1518,7 @@ export default function VoiceoverPage() {
     const shotList = shots.map(s => ({ imageUrl: s.imageUrl || undefined, subtitle: s.subtitle || '', duration: s.duration || 5 }));
     setMerging(true); setMergeError(''); setMergedVideoUrl(null);
     try {
-      const res = await api.post<{ url: string }>('/voiceover/merge-images', { shots: shotList, audioUrl, voice, ratio });
+      const res = await api.post<{ url: string }>('/voiceover/merge-images', { shots: shotList, audioUrl, voice, ratio, subtitleStyle, banner, bannerStyle, wordBoundaries });
       setMergedVideoUrl(res.url);
     } catch (err) {
       const msg = err instanceof Error ? err.message : '合并失败';
@@ -1252,6 +1550,9 @@ export default function VoiceoverPage() {
     showJsonPreview, onToggleJsonPreview: () => setShowJsonPreview(v => !v),
     subtitleMode, onSubtitleModeChange: (v: 'on' | 'off') => setSubtitleMode(v),
     voice, onVoiceChange: (v: string) => setVoice(v),
+    banner, onBannerChange: (v: string) => setBanner(v),
+    bannerStyle, onBannerStyleChange: (v: BannerStyle) => setBannerStyle(v),
+    subtitleStyle, onSubtitleStyleChange: (v: SubtitleStyle) => setSubtitleStyle(v),
     duration: shots[0]?.duration || 8,
     mediaItems,
   };
@@ -1299,10 +1600,15 @@ export default function VoiceoverPage() {
                     </div>
                     {batchLoading ? <p style={{ textAlign: 'center', color: '#9ca3af' }}>加载中...</p> : batchList.length === 0 ? <p style={{ textAlign: 'center', color: '#9ca3af' }}>暂无历史任务</p> : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        {batchList.map(b => (
+                        {batchList.map(b => {
+                          const allSucceeded = b.tasks && Object.keys(b.tasks).length > 0 && Object.values(b.tasks).every(t => t.status === 'succeeded');
+                          return (
                           <div key={b.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, background: batchId === b.id ? '#eff6ff' : '#fff' }}>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.name}</p>
+                              <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {allSucceeded && <span style={{ color: '#16a34a', marginRight: 4 }} title="全部生成成功">&#10003;</span>}
+                                {b.name}
+                              </p>
                               <p style={{ margin: '2px 0 0', fontSize: 11, color: '#9ca3af' }}>
                                 {b.shots?.length || 0} 个分镜 · {new Date(b.created_at).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
                               </p>
@@ -1318,7 +1624,8 @@ export default function VoiceoverPage() {
                               </button>
                             </div>
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -1412,8 +1719,8 @@ export default function VoiceoverPage() {
                         )}
                       </span></p>
                     <select value={voice} onChange={e => setVoice(e.target.value)}
-                      style={{ fontSize: 11, padding: '3px 6px', borderRadius: 6, border: '1px solid #111827', background: '#fff', color: '#374151', cursor: 'pointer', width: 62 }}>
-                      {AZURE_VOICES.map((v, i) => <option key={v.value} value={v.value}>{i === 0 && voice === v.value ? '音色' : v.label}</option>)}
+                      style={{ fontSize: 11, padding: '3px 6px', borderRadius: 6, border: '1px solid #111827', background: '#fff', color: '#374151', cursor: 'pointer', width: 110 }}>
+                      {AZURE_VOICES.map((v) => <option key={v.value} value={v.value}>{v.label}</option>)}
                     </select>
                     <button type="button" onClick={handleRegenTTS} disabled={ttsLoading || !subtitleInput.trim()}
                       style={{ fontSize: 11, padding: '2px 8px', border: '1px solid #111827', borderRadius: 5, background: ttsLoading ? '#f3f4f6' : '#fff', cursor: (ttsLoading || !subtitleInput.trim()) ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap', color: '#374151' }}>
@@ -1520,7 +1827,7 @@ export default function VoiceoverPage() {
                   </div>
 
                   {/* 主体定义 */}
-                  <div style={{ marginBottom: 14 }}>
+                  <div style={{ marginBottom: 14, display: 'none' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                       <button type="button" onClick={handleAnalyzeSubjects}
                         disabled={analyzingSubjects || mediaItems.filter(m => m.mediaType === 'image' && !m.uploading).length === 0}
@@ -1531,7 +1838,7 @@ export default function VoiceoverPage() {
                           </span>
                         ) : '主体定义'}
                       </button>
-                      <span style={{ fontSize: 11, color: '#9ca3af' }}>AI 分析素材中的主体，用于后续分镜引用</span>
+                      <span style={{ fontSize: 11, color: '#9ca3af', display: 'none' }}>AI 分析素材中的主体，用于后续分镜引用</span>
                     </div>
                     {subjectError && <div className={styles.errInline} style={{ marginBottom: 8 }}>{subjectError}</div>}
                     {subjectDefs && (
@@ -1555,7 +1862,7 @@ export default function VoiceoverPage() {
                     {initing ? (
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                         <span className={styles.spinner} style={{ borderColor: '#5eead4', borderTopColor: '#fff' }} />
-                        AI 分析分镜中…
+                        分镜进行中...
                       </span>
                     ) : anyUploading ? '素材上传中，请等待…' : initResult ? '重新生成分镜脚本' : '一键生成分镜'}
                   </button>
@@ -1704,7 +2011,7 @@ export default function VoiceoverPage() {
                             {succeededCount >= 1 && (
                               <button type="button" onClick={handleMerge} disabled={merging || !canMerge}
                                 className={styles.btnSmGreen} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '7px 32px', fontSize: 15, fontWeight: 600, borderRadius: 10 }}>
-                                {merging ? <><span className={styles.spinner} style={{ borderColor: '#bbf7d0', borderTopColor: '#16a34a' }} />合并中…</> : mergedVideoUrl ? '重新合并(分镜视频+字幕+配音)' : '分镜合并(分镜视频+字幕+配音)'}
+                                {merging ? <><span className={styles.spinner} style={{ borderColor: '#bbf7d0', borderTopColor: '#16a34a' }} />合并中…</> : mergedVideoUrl ? '重新生成(分镜视频+字幕+配音)' : '分镜合并(分镜视频+字幕+配音)'}
                               </button>
                             )}
                           </div>
